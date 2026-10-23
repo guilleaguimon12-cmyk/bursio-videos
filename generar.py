@@ -31,18 +31,25 @@ MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "
 
 TEMAS = {
     "economia": {
-        "etiqueta": "ECONOMÍA GLOBAL", "acento": GREEN,
+        "etiqueta": "ECONOMÍA GLOBAL", "acento": GREEN, "corto": "ECONOMÍA", "nombre": "economía",
         "intro_voz": "Esto es lo que mueve hoy la economía.",
         "intro": ("Lo que mueve hoy", "la economía mundial"),
         "hashtags": "#economia #noticias #finanzas #bolsa #inversion #mercados",
         "texto": "La economía global que importa hoy, en poco más de un minuto.",
     },
     "internacional": {
-        "etiqueta": "INTERNACIONAL", "acento": BLUE,
+        "etiqueta": "INTERNACIONAL", "acento": BLUE, "corto": "POLÍTICA MUNDIAL", "nombre": "política internacional",
         "intro_voz": "Esto es lo más importante de la política internacional hoy.",
         "intro": ("Lo que importa hoy", "en el mundo"),
         "hashtags": "#noticias #politica #actualidad #internacional #geopolitica",
         "texto": "La política internacional que importa hoy, en poco más de un minuto.",
+    },
+    "deporte": {
+        "etiqueta": "DEPORTES", "acento": GOLD, "corto": "DEPORTES", "nombre": "deportes",
+        "intro_voz": "Deportes: lo que importa hoy.",
+        "intro": ("Lo que importa hoy", "en el deporte"),
+        "hashtags": "#noticias #deportes #actualidad #futbol #deporte",
+        "texto": "Lo que importa hoy en el deporte, en poco más de un minuto.",
     },
 }
 CTA_VOZ = "Esto es Bursio: lo que importa, cada mañana en tu correo. Síguenos para no perderte nada."
@@ -113,14 +120,68 @@ def tendencia(item):
     if re.search(r"\b(sube|suben|subirá|gana|dispar|crece|récord|eleva|dispara|avanza|repunt|máximo)", t): return "sube"
     return None
 
-def icono(item, t):
+def icono(item, t, tema=""):
     s = (item.get("titulo", "") + " " + item.get("resumen", "")).lower()
+    if tema == "deporte":
+        if re.search(r"maratón|atletism|dopaje|carrera|ciclism|tour|fórmula|f1|motogp|gran premio", s): return lambda: icon_crono(t)
+        if re.search(r"premio|trofeo|balón de oro|título|campeón|campeona|copa|legado", s): return lambda: icon_trofeo(t)
+        return lambda: icon_balon(t)
     if re.search(r"coche|automo|volkswagen|tesla|vehícul", s): return lambda: icon_car(0.95, CREAM + (255,))
     if re.search(r"hipotec|vivienda|alquiler|euríbor|casa", s): return lambda: icon_house(0.8, BLUE + (255,))
     if re.search(r"europa|\bue\b|bruselas|comisión europea|eurozona|bce", s): return lambda: icon_eu(1.0, (90, 130, 230, 255), t)
     if re.search(r"banc|fed\b|reserva federal|tipos|bolsa|ibex|wall street|beneficio", s): return lambda: icon_bank(0.62, GOLD + (255,))
     if re.search(r"gobierno|congreso|senado|constitucional|tribunal|parlament|elecci|ministr|president", s): return lambda: icon_bank(0.62, BLUE + (255,))
     return lambda: icon_globo(t)
+
+def icon_balon(t, s=1.0):
+    """Balón de fútbol que gira despacio."""
+    R = int(140 * s); im = Image.new("RGBA", (2 * R + 20, 2 * R + 20), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    c = R + 10
+    d.ellipse([c - R, c - R, c + R, c + R], fill=CREAM + (255,), outline=CREAM + (255,))
+    def pent(cx, cy, r, rot):
+        return [(cx + r * math.cos(rot + k * 2 * math.pi / 5), cy + r * math.sin(rot + k * 2 * math.pi / 5)) for k in range(5)]
+    rot = t * 0.8
+    d.polygon(pent(c, c, R * 0.36, rot - math.pi / 2), fill=(20, 20, 24, 255))
+    for k in range(5):
+        a = rot - math.pi / 2 + k * 2 * math.pi / 5
+        cx, cy = c + R * 0.82 * math.cos(a), c + R * 0.82 * math.sin(a)
+        d.polygon(pent(cx, cy, R * 0.26, a + math.pi / 5), fill=(20, 20, 24, 255))
+        x1, y1 = c + R * 0.36 * math.cos(a), c + R * 0.36 * math.sin(a)
+        d.line([(x1, y1), (c + R * 0.6 * math.cos(a), c + R * 0.6 * math.sin(a))], fill=(20, 20, 24, 255), width=6)
+    m = Image.new("L", im.size, 0); ImageDraw.Draw(m).ellipse([c - R, c - R, c + R, c + R], fill=255)
+    out = Image.new("RGBA", im.size, (0, 0, 0, 0)); out.paste(im, (0, 0), m)
+    ImageDraw.Draw(out).ellipse([c - R, c - R, c + R, c + R], outline=GOLD + (255,), width=6)
+    return out
+
+def icon_trofeo(t, s=1.0):
+    """Copa dorada con un brillo que pasa."""
+    w, h = int(300 * s), int(300 * s); im = Image.new("RGBA", (w, h), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    g = GOLD + (255,); cx = w // 2
+    d.pieslice([cx - 95, -60, cx + 95, 170], 0, 180, fill=g)
+    d.rectangle([cx - 95, 0, cx + 95, 55], fill=g)
+    d.arc([cx - 150, 10, cx - 60, 110], 90, 270, fill=g, width=14)
+    d.arc([cx + 60, 10, cx + 150, 110], 270, 90, fill=g, width=14)
+    d.rectangle([cx - 16, 165, cx + 16, 225], fill=g)
+    d.rounded_rectangle([cx - 80, 225, cx + 80, 260], 8, fill=g)
+    d.rounded_rectangle([cx - 105, 260, cx + 105, 295], 8, fill=GOLD2 + (255,))
+    x = int((t * 0.7 % 1.6) / 1.6 * (w + 120)) - 60
+    d.line([(x, 0), (x - 50, 170)], fill=(255, 255, 255, 110), width=16)
+    m = Image.new("L", im.size, 0); m.paste(im.getchannel("A")); im.putalpha(m)
+    return im
+
+def icon_crono(t, s=1.0):
+    """Cronómetro con la aguja corriendo."""
+    R = int(130 * s); im = Image.new("RGBA", (2 * R + 20, 2 * R + 70), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    c, cy = R + 10, R + 60; col = CREAM + (255,)
+    d.rounded_rectangle([c - 26, 6, c + 26, 40], 8, fill=GOLD + (255,)); d.rectangle([c - 10, 38, c + 10, 62], fill=GOLD + (255,))
+    d.ellipse([c - R, cy - R, c + R, cy + R], outline=col, width=12)
+    for k in range(12):
+        a = k * math.pi / 6; r1 = R - 22 if k % 3 else R - 38
+        d.line([(c + r1 * math.cos(a), cy + r1 * math.sin(a)), (c + (R - 10) * math.cos(a), cy + (R - 10) * math.sin(a))], fill=col, width=6)
+    a = t * 2.4 - math.pi / 2
+    d.line([(c, cy), (c + (R - 30) * math.cos(a), cy + (R - 30) * math.sin(a))], fill=RED + (255,), width=9)
+    d.ellipse([c - 12, cy - 12, c + 12, cy + 12], fill=RED + (255,))
+    return im
 
 def icon_globo(t, s=1.0):
     """Globo terráqueo de líneas, como el logo de Bursio (recurso por defecto)."""
@@ -162,11 +223,17 @@ def escena_item(n, item, tema):
     titulo = limpiar(item.get("titulo"))
     if len(titulo) > 110: titulo = titulo[:107].rsplit(" ", 1)[0] + "…"
     num, ten = cifra(item), tendencia(item)
+    marcador = None
+    if tema == "deporte":
+        num, ten = None, None
+        m = re.search(r"(?<![\d.,/])(\d{1,2})\s?-\s?(\d{1,2})(?![\d.,/])", (item.get("titulo", "") + " " + item.get("resumen", "")))
+        if m: marcador = f"{m.group(1)} – {m.group(2)}"
     cuerpo = primera_frase(item)
     def dib(im, lt, L):
         fin_t = kicker_title(im, lt, f"0{n} · {fuente}" if fuente else f"0{n}", titulo)
         y0 = max(700, fin_t + 60)
-        ic = icono(item, lt)
+        ic = icono(item, lt, tema)
+        bajo = y0 + 120
         if num:
             col = RED if ten == "baja" else GREEN if ten == "sube" else CREAM
             p = clamp((lt - 0.6) / 0.45)
@@ -175,13 +242,21 @@ def escena_item(n, item, tema):
                 timg = text_img(num, 900, 130 if len(num) < 9 else 100, col)
                 put(im, timg, 80 + sh, y0 + (1 - ease(p)) * 30, ease(p))
                 if ten: put(im, arrow(100, col, up=(ten == "sube")), 80 + timg.width + 30, y0 + 20 + math.sin(lt * 4) * 8, ease(p))
+            bajo = y0 + 170
+        elif marcador:
+            p = clamp((lt - 0.6) / 0.45)
+            if p > 0:
+                timg = text_img(marcador, 900, 170, CREAM)
+                put(im, timg, W // 2, y0 + (1 - ease(p)) * 30, ease(p), 1 + (1 - back(p)) * 0.5, anchor="ct")
+            bajo = y0 + 210
         elif ic:
-            p = ease((lt - 0.4) / 0.6); put(im, ic(), W // 2, y0 + (1 - p) * 40, p, anchor="ct")
+            img = ic(); p = ease((lt - 0.4) / 0.6); put(im, img, W // 2, y0 + (1 - p) * 40, p, anchor="ct")
+            bajo = y0 + img.height
         elif ten:
             p = ease((lt - 0.5) / 0.5); put(im, arrow(160, RED if ten == "baja" else GREEN, up=(ten == "sube")), W // 2, y0, p, anchor="ct")
         p = clamp((lt - min(2.2, L * 0.35)) / 0.5)
         if p > 0:
-            put(im, text_img(cuerpo, 500, 46, CREAM, maxw=920, lh=1.3), 80, max(1060, y0 + 260) + (1 - ease(p)) * 30, ease(p))
+            put(im, text_img(cuerpo, 500, 46, CREAM, maxw=920, lh=1.3), 80, max(1060, bajo + 60) + (1 - ease(p)) * 30, ease(p))
         a, _ = appear(lt, 1.5, 0.5, 0)
         if item.get("fuente"): put(im, text_img("Fuente: " + item["fuente"], 500, 30, MUTED), 80, 1480, a)
     return dib
@@ -207,58 +282,73 @@ def escena_cta(im, lt, L):
 
 # ───────────────────────── montaje ─────────────────────────
 def montar(tema, segmentos, fecha, carpeta):
+    import estilo as E
     os.makedirs(carpeta, exist_ok=True)
     cfg = TEMAS[tema]
-    intro = [x for x in segmentos if x.get("tipo") == "intro"][:1]
     cierre = [x for x in segmentos if x.get("tipo") == "cierre"][:1]
     noticias = [x for x in segmentos if x.get("tipo") == "noticia"]
-    durs = [audio_b64(intro[0]["audio"], f"{carpeta}/v0.wav")]
-    items = []
+    durs, items = [], []
     for x in noticias:  # se añaden noticias mientras el vídeo no pase de ~85 s
         d = audio_b64(x["audio"], f"{carpeta}/v{len(durs)}.wav")
-        if len(items) >= 3 and sum(durs) + d + 7 + (len(durs) + 2) * (LEAD + GAP) > 85:
+        if len(items) >= 3 and sum(durs) + d + 6 + (len(durs) + 2) * (LEAD + GAP) > 85:
             break
-        items.append({"titulo": x.get("titulo", ""), "resumen": x.get("texto", ""), "fuente": x.get("fuente", "")}); durs.append(d)
+        items.append(x); durs.append(d)
     durs.append(audio_b64(cierre[0]["audio"], f"{carpeta}/v{len(durs)}.wav"))
+    textos = [x.get("texto", "") for x in items] + [cierre[0].get("texto", "")]
+    n = len(items)
     cuts = [0.0]
     for d in durs[:-1]: cuts.append(round(cuts[-1] + LEAD + d + GAP, 2))
-    DUR = round(cuts[-1] + LEAD + durs[-1] + 1.8, 2); cuts.append(DUR)
-    escenas = [(escena_intro(tema), GOLD)] + [(escena_item(i + 1, it, tema), cfg["acento"] if i % 2 == 0 else GOLD) for i, it in enumerate(items)] + [(escena_cta, GOLD)]
-    # pista de voz
+    DUR = round(cuts[-1] + LEAD + durs[-1] + 1.6, 2); cuts.append(DUR)
+    # pista de voz + tiempos de cada palabra
     v = np.zeros(int(DUR * SR) + SR, np.float32)
+    subs, pausas = [], []
     for i, st in enumerate(cuts[:-1]):
         a, sr = sf.read(f"{carpeta}/v{i}.wav", dtype="float32")
         if sr != SR: a = np.interp(np.arange(int(len(a) * SR / sr)) * sr / SR, np.arange(len(a)), a).astype(np.float32)
         i0 = int((st + LEAD) * SR); v[i0:i0 + len(a)] += a[:len(v) - i0]
+        tw = [(w, x + LEAD, y + LEAD) for w, x, y in E.tiempos(a, SR, textos[i])]
+        subs.append(E.trozos(tw)); pausas.append(E.pausas_frase(tw))
     v = v[:int(DUR * SR)]; v /= max(1e-6, np.abs(v).max()) / 0.9
     sf.write(f"{carpeta}/voz.wav", v, SR)
     subprocess.run([sys.executable, "musica.py", ",".join(str(c) for c in cuts[1:-1]), str(DUR), f"{carpeta}/musica.wav"], check=True, stdout=subprocess.DEVNULL)
-    d = datetime.date.fromisoformat(fecha); etiqueta = f"{cfg['etiqueta']} · {d.day} {MESES[d.month - 1]}"
+    fotos = [E.cargar_foto(x) for x in items]
+    print(tema, "fotos:", sum(1 for f in fotos if f), "de", n, flush=True)
+    titulares = [E.caja_titular(E.titular_corto(limpiar(x.get("titulo")))) for x in items]
+    creditos = [E.credito_img(" · ".join(z for z in [("Fuente: " + x["fuente"]) if x.get("fuente") else "", x.get("credito", "")] if z)) for x in items]
+    gancho = E.etiqueta(f"{n} NOTICIAS DE {cfg['corto']} HOY")
+    marcas = [E.etiqueta(f"{i + 1}/{n}" + (f" · {x['fuente'].upper()}" if x.get("fuente") else ""), size=34) for i, x in enumerate(items)]
+    marca_bursio = text_img("Bursio", "p700", 46, CREAM)
 
     def frame(t):
         i = max(k for k in range(len(cuts) - 1) if cuts[k] <= t)
-        fn, acc = escenas[i]; t0, t1 = cuts[i], cuts[i + 1]
-        bg = background(t, acc)
-        layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        fn(layer, t - t0, durs[i])
-        if i < len(escenas) - 1:
-            p = clamp((t1 - t) / 0.3); a, dy = ease(p), (1 - p) * -50
-            if a < 1:
-                l2 = Image.new("RGBA", (W, H), (0, 0, 0, 0)); l2.alpha_composite(layer, (0, int(dy)))
-                l2.putalpha(l2.getchannel("A").point(lambda x: int(x * a))); layer = l2
-        bg.alpha_composite(layer)
+        lt = t - cuts[i]
+        if i < n:
+            if fotos[i] is not None:
+                bg = E.encuadre(fotos[i], lt, durs[i], pausas[i], i).convert("RGBA")
+                bg.alpha_composite(E.sombra())
+            else:
+                bg = background(t, cfg["acento"])
+            put(bg, marca_bursio, 70, 96, 0.9)
+            et = gancho if i == 0 and lt < 2.5 else marcas[i]
+            a = 1.0 if i == 0 else ease(lt / 0.2)
+            put(bg, et, 70, 250, a)
+            put(bg, titulares[i], 50, 330 + (1 - a) * 30, a)
+            E.dibujar_subs(bg, lt, subs[i])
+            put(bg, creditos[i], 70, 1745, 0.85)
+        else:
+            bg = background(t, GOLD)
+            escena_cta(bg, lt, durs[i])
         dd = ImageDraw.Draw(bg)
-        dd.rectangle([0, 0, W, 10], fill=(255, 255, 255, 18)); dd.rectangle([0, 0, int(W * t / DUR), 10], fill=GOLD)
-        put(bg, text_img("Bursio", "p700", 54, CREAM), 80, 120)
-        lab = text_img(etiqueta, 700, 30, GOLD); put(bg, lab, W - 80 - lab.width, 138)
-        footer(bg)
-        if t < 0.1: bg.alpha_composite(Image.new("RGBA", (W, H), (255, 255, 255, int(255 * (1 - t / 0.1)))))
+        dd.rectangle([0, 0, W, 8], fill=(255, 255, 255, 40)); dd.rectangle([0, 0, int(W * t / DUR), 8], fill=E.AMARILLO)
         if t > DUR - 0.5: bg.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, int(255 * (t - (DUR - 0.5)) / 0.5))))
         return bg.convert("RGB")
 
+    if os.environ.get("FOTOGRAMAS"):
+        for s in os.environ["FOTOGRAMAS"].split(","): frame(float(s)).save(f"{carpeta}/f_{s}.png")
+        return {"duracion": DUR}
     mudo = f"{carpeta}/mudo.mp4"
     p = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-                          "-c:v", "libx264", "-preset", "medium", "-crf", "21", "-pix_fmt", "yuv420p", mudo], stdin=subprocess.PIPE)
+                          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", mudo], stdin=subprocess.PIPE)
     for k in range(int(DUR * FPS)): p.stdin.write(frame(k / FPS).tobytes())
     p.stdin.close(); p.wait()
     final = f"{OUT}/{tema}.mp4"
@@ -269,8 +359,9 @@ def montar(tema, segmentos, fecha, carpeta):
                     "[md][vm]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]",
                     "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-shortest",
                     "-movflags", "+faststart", final], check=True)
-    return {"video": final, "duracion": DUR, "titulares": [it["titulo"] for it in items],
-            "texto": f"{cfg['texto']} Cada mañana, lo que importa en tu correo: bursio.org {cfg['hashtags']} #bursio"}
+    t1 = E.titular_corto(limpiar(items[0].get("titulo")), 110)
+    return {"video": final, "duracion": DUR, "titulares": [x.get("titulo", "") for x in items],
+            "texto": f"{t1}. Y {n - 1} noticias más de {cfg['nombre']} hoy, en un minuto. Cada mañana, lo que importa: bursio.org {cfg['hashtags']} #bursio"}
 
 def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
