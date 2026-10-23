@@ -1,0 +1,4 @@
+salida/
+tmp_*/
+__pycache__/
+*.wav
