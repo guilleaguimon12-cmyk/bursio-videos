@@ -1,0 +1,66 @@
+name: Vídeos diarios de Bursio
+
+on:
+  schedule:
+    # Dos intentos por si GitHub se retrasa; el segundo no hace nada si ya están.
+    # 04:40 y 05:40 UTC = 05:40 y 06:40 en Madrid (invierno) / 06:40 y 07:40 (verano)
+    - cron: "40 4 * * *"
+    - cron: "40 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: videos
+  cancel-in-progress: false
+
+jobs:
+  videos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: ¿Ya están los de hoy?
+        id: hoy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          FECHA=$(TZ=Europe/Madrid date +%F)
+          echo "fecha=$FECHA" >> "$GITHUB_OUTPUT"
+          if gh release view "$FECHA" >/dev/null 2>&1 && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "hecho=1" >> "$GITHUB_OUTPUT"; echo "Los vídeos de $FECHA ya existen."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.hoy.outputs.hecho != '1'
+
+      - name: Instalar ffmpeg
+        if: steps.hoy.outputs.hecho != '1'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - uses: actions/setup-python@v5
+        if: steps.hoy.outputs.hecho != '1'
+        with:
+          python-version: "3.11"
+
+      - name: Instalar librerías
+        if: steps.hoy.outputs.hecho != '1'
+        run: pip install --quiet pillow numpy soundfile
+
+      - name: Generar los vídeos
+        if: steps.hoy.outputs.hecho != '1'
+        env:
+          APPS_URL: https://script.google.com/macros/s/AKfycbySu6dldXPPc5ikwS--56MGIuTp2nqmcQon3c5DO3akwky1k0qPTeC6CX6yv6SYw0eO/exec
+        run: python generar.py
+
+      - name: Publicar los vídeos (Releases)
+        if: steps.hoy.outputs.hecho != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FECHA=${{ steps.hoy.outputs.fecha }}
+          gh release delete "$FECHA" -y --cleanup-tag || true
+          gh release create "$FECHA" salida/*.mp4 salida/textos.json --title "Vídeos $FECHA" --notes "Vídeos diarios de Bursio para TikTok."
+          # Solo se guardan las 14 últimas fechas
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | sort -r | tail -n +15 | while read T; do gh release delete "$T" -y --cleanup-tag || true; done
