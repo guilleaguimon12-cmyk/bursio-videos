@@ -15,13 +15,16 @@ AMARILLO = (255, 214, 10)
 UA = "BursioBot/1.0 (https://bursio.org; hola@bursio.org)"
 
 # ───────────────────────── fotos ─────────────────────────
-def cargar_foto(seg):
+def cargar_foto(f):
+    """f: {"b64"|"foto_b64": ..., "url"|"foto": ...}"""
     datos = None
-    if seg.get("foto_b64"):
-        datos = base64.b64decode(seg["foto_b64"])
-    elif seg.get("foto"):
+    b64 = f.get("b64") or f.get("foto_b64")
+    url = f.get("url") or f.get("foto")
+    if b64:
+        datos = base64.b64decode(b64)
+    elif url:
         try:
-            req = urllib.request.Request(seg["foto"], headers={"User-Agent": UA})
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=60) as r: datos = r.read()
         except Exception as e:
             print("No se pudo bajar la foto:", e, flush=True)
@@ -30,13 +33,20 @@ def cargar_foto(seg):
         im = Image.open(io.BytesIO(datos)).convert("RGB")
     except Exception:
         return None
-    # cubrir 1080x1920 con margen para el zoom (x1.3)
     s = max(W * 1.3 / im.width, H * 1.3 / im.height)
     im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
-    # un pelín de contraste y color, como una foto de móvil
     from PIL import ImageEnhance
     im = ImageEnhance.Contrast(im).enhance(1.08); im = ImageEnhance.Color(im).enhance(1.1)
     return im
+
+def fotos_de(seg):
+    """Todas las fotos de una noticia (hasta 3), con su crédito."""
+    lista = seg.get("fotos") or ([{"b64": seg.get("foto_b64"), "url": seg.get("foto"), "credito": seg.get("credito", "")}] if (seg.get("foto_b64") or seg.get("foto")) else [])
+    out = []
+    for f in lista:
+        im = cargar_foto(f)
+        if im is not None: out.append((im, f.get("credito", "")))
+    return out
 
 _SOMBRA = None
 def sombra():
@@ -53,19 +63,19 @@ def sombra():
         _SOMBRA = Image.new("RGBA", (W, H), (0, 0, 0, 255)); _SOMBRA.putalpha(al)
     return _SOMBRA
 
-def encuadre(foto, lt, L, pausas, semilla):
-    """Zoom lento + golpe de zoom en cada pausa (cambia el plano sin cambiar de foto)."""
+def tramo(lt, pausas):
+    """En qué plano estamos (cambia en cada pausa de la voz) y desde cuándo."""
     k = sum(1 for p in pausas if lt >= p)
-    t0 = max([0.0] + [p for p in pausas if lt >= p])
-    z = 1.0 + 0.10 * (k % 2) + 0.035 * (lt - t0)  # alterna plano abierto / cerrado
-    pop = 1 + 0.10 * (1 - ease((lt - t0) / 0.35)) if lt < t0 + 0.35 else 1  # golpe de entrada
-    z *= pop
+    return k, max([0.0] + [p for p in pausas if lt >= p])
+
+def encuadre(foto, lt, t0):
+    """Zoom lento siempre hacia el centro, con un pequeño golpe al entrar."""
+    d = lt - t0
+    z = 1.0 + 0.03 * d
+    if d < 0.35: z *= 1 + 0.08 * (1 - ease(d / 0.35))
     fw, fh = foto.width, foto.height
     cw, ch = min(fw, 1.25 * W / z), min(fh, 1.25 * H / z)
-    # centro: un poco por encima del medio (caras), se mueve despacio
-    rx = 0.5 + 0.06 * math.sin(semilla * 1.7 + k * 2.1) + 0.012 * (lt - t0) * (1 if (k + semilla) % 2 else -1)
-    ry = 0.42 + 0.04 * math.cos(semilla + k * 1.3)
-    cx = clamp(rx * fw, cw / 2, fw - cw / 2); cy = clamp(ry * fh, ch / 2, fh - ch / 2)
+    cx, cy = fw / 2, fh / 2
     caja = (int(cx - cw / 2), int(cy - ch / 2), int(cx + cw / 2), int(cy + ch / 2))
     return foto.resize((W, H), Image.BILINEAR, box=caja)
 
@@ -132,7 +142,16 @@ def pausas_frase(tw):
     for i in range(1, len(tw)):
         if re.search(r"[.;:?!]$", tw[i - 1][0]) or (re.search(r",$", tw[i - 1][0]) and tw[i][1] - tw[i - 1][2] > 0.18):
             r.append(tw[i][1])
-    return r
+    # ningún plano dura más de ~3,5 s: si hay un tramo largo, se parte por la palabra más cercana
+    fin = tw[-1][2] if tw else 0
+    marcas = [tw[0][1] if tw else 0] + r + [fin]
+    extra = []
+    for a, b in zip(marcas, marcas[1:]):
+        n = int((b - a) // 3.5)
+        for j in range(1, n + 1):
+            obj = a + (b - a) * j / (n + 1)
+            extra.append(min((w[1] for w in tw), key=lambda x: abs(x - obj)))
+    return sorted(set(r + extra))
 
 # ───────────────────────── subtítulos ─────────────────────────
 def trozos(tw, maxp=3, maxc=18):

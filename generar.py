@@ -311,10 +311,11 @@ def montar(tema, segmentos, fecha, carpeta):
     v = v[:int(DUR * SR)]; v /= max(1e-6, np.abs(v).max()) / 0.9
     sf.write(f"{carpeta}/voz.wav", v, SR)
     subprocess.run([sys.executable, "musica.py", ",".join(str(c) for c in cuts[1:-1]), str(DUR), f"{carpeta}/musica.wav"], check=True, stdout=subprocess.DEVNULL)
-    fotos = [E.cargar_foto(x) for x in items]
-    print(tema, "fotos:", sum(1 for f in fotos if f), "de", n, flush=True)
+    fotos = [E.fotos_de(x) for x in items]
+    print(tema, "fotos por noticia:", [len(f) for f in fotos], flush=True)
     titulares = [E.caja_titular(E.titular_corto(limpiar(x.get("titulo")))) for x in items]
-    creditos = [E.credito_img(" · ".join(z for z in [("Fuente: " + x["fuente"]) if x.get("fuente") else "", x.get("credito", "")] if z)) for x in items]
+    def cred(x, c): return E.credito_img(" · ".join(z for z in [("Fuente: " + x["fuente"]) if x.get("fuente") else "", c] if z))
+    creditos = [[cred(x, c) for _, c in fotos[i]] or [cred(x, "")] for i, x in enumerate(items)]
     gancho = E.etiqueta(f"{n} NOTICIAS DE {cfg['corto']} HOY")
     marcas = [E.etiqueta(f"{i + 1}/{n}" + (f" · {x['fuente'].upper()}" if x.get("fuente") else ""), size=34) for i, x in enumerate(items)]
     marca_bursio = text_img("Bursio", "p700", 46, CREAM)
@@ -323,8 +324,9 @@ def montar(tema, segmentos, fecha, carpeta):
         i = max(k for k in range(len(cuts) - 1) if cuts[k] <= t)
         lt = t - cuts[i]
         if i < n:
-            if fotos[i] is not None:
-                bg = E.encuadre(fotos[i], lt, durs[i], pausas[i], i).convert("RGBA")
+            k, t0 = E.tramo(lt, pausas[i])
+            if fotos[i]:
+                bg = E.encuadre(fotos[i][k % len(fotos[i])][0], lt, t0).convert("RGBA")
                 bg.alpha_composite(E.sombra())
             else:
                 bg = background(t, cfg["acento"])
@@ -334,7 +336,7 @@ def montar(tema, segmentos, fecha, carpeta):
             put(bg, et, 70, 250, a)
             put(bg, titulares[i], 50, 330 + (1 - a) * 30, a)
             E.dibujar_subs(bg, lt, subs[i])
-            put(bg, creditos[i], 70, 1745, 0.85)
+            put(bg, creditos[i][k % len(creditos[i])], 70, 1745, 0.85)
         else:
             bg = background(t, GOLD)
             escena_cta(bg, lt, durs[i])
