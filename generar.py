@@ -263,9 +263,11 @@ def escena_item(n, item, tema):
 
 def escena_intro(tema):
     l1, l2 = TEMAS[tema]["intro"]
+    t1 = text_img(l1, "p800", 96, CREAM, align="center", maxw=980); t2 = text_img(l2, "p800", 96, GOLD2, align="center", maxw=980)
     def dib(im, lt, L):
-        a, y = appear(lt, 0.0, 0.4); put(im, text_img(l1, "p800", 96, CREAM, align="center", maxw=980), W // 2, 640 + y, a, anchor="ct")
-        a, y = appear(lt, 0.25, 0.4); put(im, text_img(l2, "p800", 96, GOLD2, align="center", maxw=980), W // 2, 760 + y, a, anchor="ct")
+        # visible desde el primer fotograma (es también la miniatura)
+        put(im, t1, W // 2, 640, 1.0, 1 + 0.03 * clamp(lt / L), anchor="ct")
+        put(im, t2, W // 2, 760, 1.0, 1 + 0.03 * clamp(lt / L), anchor="ct")
     return dib
 
 def escena_cta(im, lt, L):
@@ -285,58 +287,77 @@ def montar(tema, segmentos, fecha, carpeta):
     import estilo as E
     os.makedirs(carpeta, exist_ok=True)
     cfg = TEMAS[tema]
+    intro = [x for x in segmentos if x.get("tipo") == "intro"][:1]
     cierre = [x for x in segmentos if x.get("tipo") == "cierre"][:1]
     noticias = [x for x in segmentos if x.get("tipo") == "noticia"]
-    durs, items = [], []
+    off = len(intro)
+    durs = [audio_b64(intro[0]["audio"], f"{carpeta}/v0.wav")] if intro else []
+    items = []
     for x in noticias:  # se añaden noticias mientras el vídeo no pase de ~85 s
         d = audio_b64(x["audio"], f"{carpeta}/v{len(durs)}.wav")
         if len(items) >= 3 and sum(durs) + d + 6 + (len(durs) + 2) * (LEAD + GAP) > 85:
             break
         items.append(x); durs.append(d)
     durs.append(audio_b64(cierre[0]["audio"], f"{carpeta}/v{len(durs)}.wav"))
-    textos = [x.get("texto", "") for x in items] + [cierre[0].get("texto", "")]
+    textos = [x.get("texto", "") for x in intro + items] + [cierre[0].get("texto", "")]
     n = len(items)
     cuts = [0.0]
     for d in durs[:-1]: cuts.append(round(cuts[-1] + LEAD + d + GAP, 2))
     DUR = round(cuts[-1] + LEAD + durs[-1] + 1.6, 2); cuts.append(DUR)
-    # pista de voz + tiempos de cada palabra
+    fotos = [E.fotos_de(x) for x in items]
+    print(tema, "fotos por noticia:", [len(f) for f in fotos], flush=True)
+    # pista de voz + tiempos de cada palabra + cortes de foto
     v = np.zeros(int(DUR * SR) + SR, np.float32)
-    subs, pausas = [], []
+    subs, cortes = [], []
     for i, st in enumerate(cuts[:-1]):
         a, sr = sf.read(f"{carpeta}/v{i}.wav", dtype="float32")
         if sr != SR: a = np.interp(np.arange(int(len(a) * SR / sr)) * sr / SR, np.arange(len(a)), a).astype(np.float32)
         i0 = int((st + LEAD) * SR); v[i0:i0 + len(a)] += a[:len(v) - i0]
         tw = [(w, x + LEAD, y + LEAD) for w, x, y in E.tiempos(a, SR, textos[i])]
-        subs.append(E.trozos(tw)); pausas.append(E.pausas_frase(tw))
+        subs.append(E.trozos(tw))
+        j = i - off
+        cortes.append(E.cortes(tw, len(fotos[j])) if 0 <= j < n else [])
     v = v[:int(DUR * SR)]; v /= max(1e-6, np.abs(v).max()) / 0.9
     sf.write(f"{carpeta}/voz.wav", v, SR)
+    # sonido de transición: en cada cambio de escena y en cada cambio de foto
+    fx = np.zeros(int(DUR * SR) + SR, np.float32)
+    momentos = [c for c in cuts[1:-1]] + [cuts[i] + c for i in range(len(cortes)) for c in cortes[i]]
+    for k, m in enumerate(sorted(momentos)):
+        w = E.whoosh(SR, semilla=k); i0 = max(0, int((m - 0.22) * SR))
+        fx[i0:i0 + len(w)] += w[:len(fx) - i0]
+    sf.write(f"{carpeta}/fx.wav", fx[:int(DUR * SR)], SR)
     subprocess.run([sys.executable, "musica.py", ",".join(str(c) for c in cuts[1:-1]), str(DUR), f"{carpeta}/musica.wav"], check=True, stdout=subprocess.DEVNULL)
-    fotos = [E.fotos_de(x) for x in items]
-    print(tema, "fotos por noticia:", [len(f) for f in fotos], flush=True)
     titulares = [E.caja_titular(E.titular_corto(limpiar(x.get("titulo")))) for x in items]
     def cred(x, c): return E.credito_img(" · ".join(z for z in [("Fuente: " + x["fuente"]) if x.get("fuente") else "", c] if z))
     creditos = [[cred(x, c) for _, c in fotos[i]] or [cred(x, "")] for i, x in enumerate(items)]
-    gancho = E.etiqueta(f"{n} NOTICIAS DE {cfg['corto']} HOY")
     marcas = [E.etiqueta(f"{i + 1}/{n}" + (f" · {x['fuente'].upper()}" if x.get("fuente") else ""), size=34) for i, x in enumerate(items)]
     marca_bursio = text_img("Bursio", "p700", 46, CREAM)
+    d0 = datetime.date.fromisoformat(fecha)
+    et_intro = E.etiqueta(f"{n} NOTICIAS · {cfg['etiqueta']} · {d0.day} {MESES[d0.month - 1]}", size=36)
+    intro_dib = escena_intro(tema)
 
     def frame(t):
         i = max(k for k in range(len(cuts) - 1) if cuts[k] <= t)
-        lt = t - cuts[i]
-        if i < n:
-            k, t0 = E.tramo(lt, pausas[i])
-            if fotos[i]:
-                bg = E.encuadre(fotos[i][k % len(fotos[i])][0], lt, t0).convert("RGBA")
+        lt = t - cuts[i]; j = i - off
+        if off and i == 0:
+            bg = background(t, cfg["acento"])
+            put(bg, marca_bursio, 70, 96, 0.9)
+            put(bg, et_intro, W // 2, 470, 1.0, anchor="ct")
+            intro_dib(bg, lt, durs[0] + LEAD + GAP)
+        elif j < n:
+            k = sum(1 for c in cortes[i] if lt >= c)
+            t0 = max([0.0] + [c for c in cortes[i] if lt >= c])
+            if fotos[j]:
+                bg = E.encuadre(fotos[j][min(k, len(fotos[j]) - 1)][0], lt, t0).convert("RGBA")
                 bg.alpha_composite(E.sombra())
             else:
                 bg = background(t, cfg["acento"])
             put(bg, marca_bursio, 70, 96, 0.9)
-            et = gancho if i == 0 and lt < 2.5 else marcas[i]
-            a = 1.0 if i == 0 else ease(lt / 0.2)
-            put(bg, et, 70, 250, a)
-            put(bg, titulares[i], 50, 330 + (1 - a) * 30, a)
+            a = ease(lt / 0.2)
+            put(bg, marcas[j], 70, 250, a)
+            put(bg, titulares[j], 50, 330 + (1 - a) * 30, a)
             E.dibujar_subs(bg, lt, subs[i])
-            put(bg, creditos[i][k % len(creditos[i])], 70, 1745, 0.85)
+            put(bg, creditos[j][min(k, len(creditos[j]) - 1)], 70, 1745, 0.85)
         else:
             bg = background(t, GOLD)
             escena_cta(bg, lt, durs[i])
@@ -354,11 +375,12 @@ def montar(tema, segmentos, fecha, carpeta):
     for k in range(int(DUR * FPS)): p.stdin.write(frame(k / FPS).tobytes())
     p.stdin.close(); p.wait()
     final = f"{OUT}/{tema}.mp4"
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", mudo, "-i", f"{carpeta}/musica.wav", "-i", f"{carpeta}/voz.wav", "-filter_complex",
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", mudo, "-i", f"{carpeta}/musica.wav", "-i", f"{carpeta}/voz.wav", "-i", f"{carpeta}/fx.wav", "-filter_complex",
                     f"[1:a]atrim=0:{DUR},afade=t=out:st={DUR - 1.5}:d=1.5,volume=0.3[m0];"
                     "[2:a]aformat=channel_layouts=stereo,highpass=f=70,acompressor=threshold=-20dB:ratio=2:attack=8:release=120,asplit=2[vk][vm];"
                     "[m0][vk]sidechaincompress=threshold=0.05:ratio=4:attack=20:release=300[md];"
-                    "[md][vm]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]",
+                    "[3:a]aformat=channel_layouts=stereo,volume=0.55[fx];"
+                    "[md][vm][fx]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]",
                     "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-shortest",
                     "-movflags", "+faststart", final], check=True)
     t1 = E.titular_corto(limpiar(items[0].get("titulo")), 110)

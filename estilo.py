@@ -217,3 +217,34 @@ def caja_titular(texto, size=74):
 
 def credito_img(texto):
     return text_img(texto[:70], 500, 24, (220, 220, 220), maxw=W - 140)
+
+# ───────────────────────── cortes de foto y sonido de transición ─────────────────────────
+def cortes(tw, n):
+    """Momentos para pasar de una foto a la siguiente (cada foto sale una sola vez, seguidas):
+    reparte la noticia en n partes y busca la pausa de la voz más cercana."""
+    if n <= 1 or not tw: return []
+    ini, fin = tw[0][1], tw[-1][2]
+    pref = pausas_frase(tw)
+    todas = [w[1] for w in tw[1:]]
+    out = []
+    for j in range(1, n):
+        obj = ini + (fin - ini) * j / n
+        c = [p for p in pref if abs(p - obj) < 1.2] or todas
+        t = min(c, key=lambda x: abs(x - obj))
+        if (not out or t - out[-1] > 1.2) and t - ini > 1.0 and fin - t > 1.0: out.append(t)
+    return out
+
+def whoosh(sr, dur=0.45, semilla=0):
+    """Barrido de ruido tipo 'swish' (sintetizado, sin derechos)."""
+    rng = np.random.default_rng(semilla)
+    n = int(sr * dur); x = rng.standard_normal(n).astype(np.float32)
+    t = np.linspace(0, 1, n, dtype=np.float32)
+    corte = 400 + 5200 * np.clip(np.sin(np.pi * t), 0, 1) ** 1.5  # sube y baja
+    a = np.exp(-2 * np.pi * corte / sr)
+    y = np.zeros(n, np.float32); prev = 0.0
+    for i in range(n):
+        prev = (1 - a[i]) * x[i] + a[i] * prev; y[i] = prev
+    y = y - np.convolve(y, np.ones(40) / 40, mode="same")  # quita graves
+    env = np.sin(np.pi * np.clip(t * 1.15, 0, 1)) ** 2
+    y *= env
+    return (y / (np.abs(y).max() + 1e-9) * 0.5).astype(np.float32)
