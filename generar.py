@@ -298,9 +298,9 @@ def montar(tema, segmentos, fecha, carpeta):
     off = len(intro)
     durs = [audio_b64(intro[0]["audio"], f"{carpeta}/v0.wav")] if intro else []
     items = []
-    for x in noticias:  # se añaden noticias mientras el vídeo no pase de ~85 s
+    for x in noticias:  # hasta 4 noticias
         d = audio_b64(x["audio"], f"{carpeta}/v{len(durs)}.wav")
-        if len(items) >= 3 and sum(durs) + d + 6 + (len(durs) + 2) * (LEAD + GAP) > 64:
+        if len(items) >= 4:  # 4 noticias como mucho
             break
         items.append(x); durs.append(d)
     durs.append(audio_b64(cierre[0]["audio"], f"{carpeta}/v{len(durs)}.wav"))
