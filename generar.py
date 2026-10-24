@@ -361,7 +361,8 @@ def montar(tema, segmentos, fecha, carpeta):
             a = ease(lt / 0.2)
             put(bg, marcas[j], 70, 250, a)
             put(bg, titulares[j], 50, 330 + (1 - a) * 30, a)
-            E.dibujar_subs(bg, lt, subs[i])
+            fit = bool(fotos[j]) and fotos[j][min(k, len(fotos[j]) - 1)][0]["modo"] == "fit"
+            E.dibujar_subs(bg, lt, subs[i], y=1500 if fit else 1210)
             put(bg, creditos[j][min(k, len(creditos[j]) - 1)], 70, 1745, 0.85)
         else:
             bg = background(t, GOLD)
@@ -388,7 +389,7 @@ def montar(tema, segmentos, fecha, carpeta):
                     "[md][vm][fx]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]",
                     "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-shortest",
                     "-movflags", "+faststart", final], check=True)
-    t1 = E.titular_corto(limpiar(items[0].get("titulo")), 110)
+    t1 = E.titular_corto(limpiar(items[0].get("titulo")))
     return {"video": final, "duracion": DUR, "titulares": [x.get("titulo", "") for x in items],
             "texto": f"Tus noticias en 60 segundos: {cfg['nombre']}. {t1}, y {n - 1} noticias más. Cada mañana, lo que importa: bursio.org {cfg['hashtags']} #bursio"}
 

@@ -33,11 +33,22 @@ def cargar_foto(f):
         im = Image.open(io.BytesIO(datos)).convert("RGB")
     except Exception:
         return None
+    from PIL import ImageEnhance
+    im = ImageEnhance.Contrast(im).enhance(1.06); im = ImageEnhance.Color(im).enhance(1.08)
+    if im.width / im.height > 0.8:
+        # Foto horizontal: entera y nítida en el centro, sobre una copia desenfocada.
+        fw = W
+        fg = im.resize((fw, int(im.height * fw / im.width)), Image.LANCZOS)
+        if fg.height > 1000: fg = fg.crop((0, (fg.height - 1000) // 2, fw, (fg.height - 1000) // 2 + 1000))
+        sc = max(W / im.width, H / im.height)
+        bg = im.resize((int(im.width * sc) + 1, int(im.height * sc) + 1), Image.BILINEAR)
+        bg = bg.crop(((bg.width - W) // 2, (bg.height - H) // 2, (bg.width - W) // 2 + W, (bg.height - H) // 2 + H))
+        bg = bg.filter(ImageFilter.GaussianBlur(28)); bg = ImageEnhance.Brightness(bg).enhance(0.55)
+        return {"modo": "fit", "fg": fg, "bg": bg.convert("RGBA")}
+    # Foto vertical: llena la pantalla
     s = max(W * 1.3 / im.width, H * 1.3 / im.height)
     im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
-    from PIL import ImageEnhance
-    im = ImageEnhance.Contrast(im).enhance(1.08); im = ImageEnhance.Color(im).enhance(1.1)
-    return im
+    return {"modo": "cover", "img": im}
 
 def fotos_de(seg):
     """Todas las fotos de una noticia (hasta 3), con su crédito."""
@@ -68,16 +79,27 @@ def tramo(lt, pausas):
     k = sum(1 for p in pausas if lt >= p)
     return k, max([0.0] + [p for p in pausas if lt >= p])
 
+FOTO_Y = 1010  # centro de la foto horizontal
+
 def encuadre(foto, lt, t0):
     """Zoom lento siempre hacia el centro, con un pequeño golpe al entrar."""
     d = lt - t0
     z = 1.0 + 0.03 * d
     if d < 0.35: z *= 1 + 0.08 * (1 - ease(d / 0.35))
-    fw, fh = foto.width, foto.height
+    if foto["modo"] == "fit":
+        out = foto["bg"].copy()
+        fg = foto["fg"]
+        z2 = 1.0 + 0.02 * d
+        if d < 0.35: z2 *= 1 + 0.05 * (1 - ease(d / 0.35))
+        g = fg.resize((int(fg.width * z2), int(fg.height * z2)), Image.BILINEAR)
+        g = g.crop(((g.width - W) // 2, 0, (g.width - W) // 2 + W, g.height))
+        out.paste(g, (0, FOTO_Y - g.height // 2))
+        return out
+    im = foto["img"]; fw, fh = im.width, im.height
     cw, ch = min(fw, 1.25 * W / z), min(fh, 1.25 * H / z)
     cx, cy = fw / 2, fh / 2
     caja = (int(cx - cw / 2), int(cy - ch / 2), int(cx + cw / 2), int(cy + ch / 2))
-    return foto.resize((W, H), Image.BILINEAR, box=caja)
+    return im.resize((W, H), Image.BILINEAR, box=caja)
 
 # ───────────────────────── tiempos de palabras ─────────────────────────
 def silabas(p):
@@ -191,11 +213,9 @@ def dibujar_subs(im, lt, grupos, y=1210):
     put(im, capa, W // 2, y, 1.0, s, anchor="ct")
 
 # ───────────────────────── titulares ─────────────────────────
-def titular_corto(t, maxc=86):
-    t = re.sub(r"\s+", " ", t or "").strip().rstrip(".")
-    if len(t) <= maxc: return t
-    corte = t[:maxc].rsplit(" ", 1)[0].rstrip(",;:")
-    return corte + "…"
+def titular_corto(t, maxc=None):
+    """Titular entero (nunca se corta): quita espacios sobrantes y el punto final."""
+    return re.sub(r"\s+", " ", t or "").strip().rstrip(".").replace("…", "").strip()
 
 def etiqueta(texto, fondo=RED, color=(255, 255, 255), size=40):
     fnt = inter(900, size)
@@ -206,8 +226,12 @@ def etiqueta(texto, fondo=RED, color=(255, 255, 255), size=40):
     return im
 
 def caja_titular(texto, size=74):
-    """Titular en blanco con sombra fuerte (sin cajas de IA)."""
-    t = text_img(texto, 900, size, (255, 255, 255), maxw=W - 150, lh=1.12)
+    """Titular completo en blanco con sombra fuerte; si es largo, la letra se reduce
+    para que quepa entero en 5 líneas como mucho."""
+    from plantilla import wrap
+    for sz in (size, 68, 62, 57, 52, 48):
+        if len(wrap(texto, inter(900, sz), W - 150)) <= (4 if sz > 62 else 5): break
+    t = text_img(texto, 900, sz, (255, 255, 255), maxw=W - 150, lh=1.12)
     sh = Image.new("RGBA", (t.width + 40, t.height + 40), (0, 0, 0, 0))
     a = t.getchannel("A")
     s = Image.new("RGBA", t.size, (0, 0, 0, 255)); s.putalpha(a)
