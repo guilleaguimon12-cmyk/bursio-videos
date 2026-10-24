@@ -38,7 +38,7 @@ TEMAS = {
         "texto": "La economía global que importa hoy, en poco más de un minuto.",
     },
     "internacional": {
-        "etiqueta": "INTERNACIONAL", "acento": BLUE, "corto": "POLÍTICA MUNDIAL", "nombre": "política internacional",
+        "etiqueta": "POLÍTICA INTERNACIONAL", "acento": BLUE, "corto": "POLÍTICA MUNDIAL", "nombre": "política internacional",
         "intro_voz": "Esto es lo más importante de la política internacional hoy.",
         "intro": ("Lo que importa hoy", "en el mundo"),
         "hashtags": "#noticias #politica #actualidad #internacional #geopolitica",
@@ -261,13 +261,16 @@ def escena_item(n, item, tema):
         if item.get("fuente"): put(im, text_img("Fuente: " + item["fuente"], 500, 30, MUTED), 80, 1480, a)
     return dib
 
+SERIE = ("Tus noticias", "en 60 segundos")
+
 def escena_intro(tema):
-    l1, l2 = TEMAS[tema]["intro"]
-    t1 = text_img(l1, "p800", 96, CREAM, align="center", maxw=980); t2 = text_img(l2, "p800", 96, GOLD2, align="center", maxw=980)
+    t1 = text_img(SERIE[0], "p800", 118, CREAM, align="center", maxw=1000)
+    t2 = text_img(SERIE[1], "p800", 118, GOLD2, align="center", maxw=1000)
     def dib(im, lt, L):
         # visible desde el primer fotograma (es también la miniatura)
-        put(im, t1, W // 2, 640, 1.0, 1 + 0.03 * clamp(lt / L), anchor="ct")
-        put(im, t2, W // 2, 760, 1.0, 1 + 0.03 * clamp(lt / L), anchor="ct")
+        z = 1 + 0.03 * clamp(lt / L)
+        put(im, t1, W // 2, 600, 1.0, z, anchor="ct")
+        put(im, t2, W // 2, 745, 1.0, z, anchor="ct")
     return dib
 
 def escena_cta(im, lt, L):
@@ -295,7 +298,7 @@ def montar(tema, segmentos, fecha, carpeta):
     items = []
     for x in noticias:  # se añaden noticias mientras el vídeo no pase de ~85 s
         d = audio_b64(x["audio"], f"{carpeta}/v{len(durs)}.wav")
-        if len(items) >= 3 and sum(durs) + d + 6 + (len(durs) + 2) * (LEAD + GAP) > 85:
+        if len(items) >= 3 and sum(durs) + d + 6 + (len(durs) + 2) * (LEAD + GAP) > 64:
             break
         items.append(x); durs.append(d)
     durs.append(audio_b64(cierre[0]["audio"], f"{carpeta}/v{len(durs)}.wav"))
@@ -333,7 +336,7 @@ def montar(tema, segmentos, fecha, carpeta):
     marcas = [E.etiqueta(f"{i + 1}/{n}" + (f" · {x['fuente'].upper()}" if x.get("fuente") else ""), size=34) for i, x in enumerate(items)]
     marca_bursio = text_img("Bursio", "p700", 46, CREAM)
     d0 = datetime.date.fromisoformat(fecha)
-    et_intro = E.etiqueta(f"{n} NOTICIAS · {cfg['etiqueta']} · {d0.day} {MESES[d0.month - 1]}", size=36)
+    et_intro = E.etiqueta(f"{cfg['etiqueta']} · {d0.day} {MESES[d0.month - 1]}", size=52)
     intro_dib = escena_intro(tema)
 
     def frame(t):
@@ -342,7 +345,7 @@ def montar(tema, segmentos, fecha, carpeta):
         if off and i == 0:
             bg = background(t, cfg["acento"])
             put(bg, marca_bursio, 70, 96, 0.9)
-            put(bg, et_intro, W // 2, 470, 1.0, anchor="ct")
+            put(bg, et_intro, W // 2, 960, 1.0, 1 + 0.05 * back(clamp(lt / 0.4)) - 0.05, anchor="ct")
             intro_dib(bg, lt, durs[0] + LEAD + GAP)
         elif j < n:
             k = sum(1 for c in cortes[i] if lt >= c)
@@ -385,7 +388,7 @@ def montar(tema, segmentos, fecha, carpeta):
                     "-movflags", "+faststart", final], check=True)
     t1 = E.titular_corto(limpiar(items[0].get("titulo")), 110)
     return {"video": final, "duracion": DUR, "titulares": [x.get("titulo", "") for x in items],
-            "texto": f"{t1}. Y {n - 1} noticias más de {cfg['nombre']} hoy, en un minuto. Cada mañana, lo que importa: bursio.org {cfg['hashtags']} #bursio"}
+            "texto": f"Tus noticias en 60 segundos: {cfg['nombre']}. {t1}, y {n - 1} noticias más. Cada mañana, lo que importa: bursio.org {cfg['hashtags']} #bursio"}
 
 def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
