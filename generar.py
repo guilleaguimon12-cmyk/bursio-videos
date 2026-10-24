@@ -77,7 +77,9 @@ def leer_datos():
         except Exception as e:
             print("Fallo al pedir los textos:", e, flush=True)
         time.sleep(240)
-    return d
+    # Nunca montar con los textos de otro día: mejor no publicar nada.
+    print("No hay vídeos de hoy; no se monta nada.", flush=True)
+    return {}
 
 def limpiar(s):
     s = re.sub(r"\s+", " ", str(s or "")).strip()
