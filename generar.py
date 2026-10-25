@@ -394,6 +394,10 @@ def montar(tema, segmentos, fecha, carpeta):
                 t_in = 0.0
             a = ease((lt - t_in) / 0.25)
             put(bg, titulares[j], 50, 230 + (1 - a) * 30, a)
+            ff = fotos[j][min(k, len(fotos[j]) - 1)][0] if fotos[j] else {}
+            if ff.get("lugar") and not (j == 0 and not off and lt < 0.6):
+                yl = (E.FOTO_Y + ff["fg"].height // 2 - 80) if ff.get("modo") == "fit" else 1100
+                put(bg, E.etiqueta_lugar(ff["lugar"]), 50, yl, ease(clamp((lt - t0 - 0.2) / 0.3)))
             if j in cifras and cifras[j][1] <= lt < cifras[j][1] + 2.8:
                 ct = lt - cifras[j][1]; ac = min(ease(ct / 0.25), 1 - ease((ct - 2.55) / 0.25))
                 put(bg, cifras[j][0], W // 2, 700, ac, 0.85 + 0.15 * back(clamp(ct / 0.35)), anchor="ct")

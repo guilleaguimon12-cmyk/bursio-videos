@@ -58,7 +58,9 @@ def fotos_de(seg):
     out = []
     for f in lista:
         im = cargar_foto(f)
-        if im is not None: out.append((im, f.get("credito", "")))
+        if im is not None:
+            im["lugar"] = f.get("lugar", "")
+            out.append((im, f.get("credito", "")))
     return out
 
 _SOMBRA = None
@@ -318,3 +320,16 @@ def cifra_grande(txt, tend=None):
         d.polygon(pts, fill=col); x += s + 40
     panel.alpha_composite(num, (x, (ph - num.height) // 2))
     return _sombra_texto(panel, blur=18)
+
+_LUGARES = {}
+def etiqueta_lugar(txt):
+    """Nombre del edificio o lugar de la foto, para que se sepa qué es."""
+    if txt not in _LUGARES:
+        t = text_img(txt.upper(), 800, 34, (255, 255, 255), maxw=W - 200)
+        pill = Image.new("RGBA", (t.width + 76, t.height + 30), (0, 0, 0, 0))
+        d = ImageDraw.Draw(pill)
+        d.rounded_rectangle((0, 0, pill.width - 1, pill.height - 1), radius=14, fill=(0, 0, 0, 175))
+        d.rectangle((18, 12, 25, pill.height - 13), fill=GOLD2)
+        pill.alpha_composite(t, (44, 15))
+        _LUGARES[txt] = pill
+    return _LUGARES[txt]
