@@ -44,7 +44,9 @@ def cargar_foto(f):
         bg = im.resize((int(im.width * sc) + 1, int(im.height * sc) + 1), Image.BILINEAR)
         bg = bg.crop(((bg.width - W) // 2, (bg.height - H) // 2, (bg.width - W) // 2 + W, (bg.height - H) // 2 + H))
         bg = bg.filter(ImageFilter.GaussianBlur(28)); bg = ImageEnhance.Brightness(bg).enhance(0.55)
-        return {"modo": "fit", "fg": fg, "bg": bg.convert("RGBA")}
+        full = im.resize((int(im.width * sc) + 1, int(im.height * sc) + 1), Image.LANCZOS)
+        full = full.crop(((full.width - W) // 2, (full.height - H) // 2, (full.width - W) // 2 + W, (full.height - H) // 2 + H))
+        return {"modo": "fit", "fg": fg, "bg": bg.convert("RGBA"), "full": full}
     # Foto vertical: llena la pantalla
     s = max(W * 1.3 / im.width, H * 1.3 / im.height)
     im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
@@ -240,7 +242,7 @@ def caja_titular(texto, size=74):
     return out
 
 def credito_img(texto):
-    return text_img(texto[:70], 500, 24, (220, 220, 220), maxw=W - 140)
+    return text_img(texto[:80], 500, 20, (220, 220, 220), maxw=W - 140)
 
 # ───────────────────────── cortes de foto y sonido de transición ─────────────────────────
 def cortes(tw, n):
@@ -272,3 +274,28 @@ def whoosh(sr, dur=0.45, semilla=0):
     env = np.sin(np.pi * np.clip(t * 1.15, 0, 1)) ** 2
     y *= env
     return (y / (np.abs(y).max() + 1e-9) * 0.5).astype(np.float32)
+
+# ───────────────────────── estilo "Colglobal": serif limpio ─────────────────────────
+def _sombra_texto(t, blur=10, off=(0, 6)):
+    sh = Image.new("RGBA", (t.width + 60, t.height + 60), (0, 0, 0, 0))
+    s = Image.new("RGBA", t.size, (0, 0, 0, 230)); s.putalpha(t.getchannel("A").point(lambda v: int(v * 0.9)))
+    sh.alpha_composite(s, (30 + off[0], 30 + off[1])); sh = sh.filter(ImageFilter.GaussianBlur(blur))
+    out = Image.new("RGBA", sh.size, (0, 0, 0, 0)); out.alpha_composite(sh); out.alpha_composite(t, (30, 30))
+    return out
+
+def titular_serif(texto, size=112):
+    """Titular corto en serif blanca, sin cajas (estilo de las cuentas de noticias que más funcionan)."""
+    from plantilla import wrap, play
+    for sz in (size, 100, 90, 80, 72):
+        if len(wrap(texto, play(800, sz), W - 160)) <= 3: break
+    return _sombra_texto(text_img(texto, "p800", sz, (255, 255, 255), maxw=W - 160, lh=1.05))
+
+def portada(seccion, fecha_txt):
+    """Portada (también miniatura): 'Tus noticias' + fecha en serif sobre la primera foto."""
+    capa = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    capa.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, 90)))
+    t1 = _sombra_texto(text_img("Tus noticias", "p800", 150, (255, 255, 255), align="center", maxw=1000), blur=14)
+    t2 = _sombra_texto(text_img(fecha_txt, "p700", 84, GOLD2, align="center", maxw=1000), blur=12)
+    t3 = _sombra_texto(text_img(seccion.upper(), 800, 40, (255, 255, 255), align="center", maxw=1000), blur=8)
+    put(capa, t1, W // 2, 610, anchor="ct"); put(capa, t2, W // 2, 800, anchor="ct"); put(capa, t3, W // 2, 940, anchor="ct")
+    return capa

@@ -34,21 +34,21 @@ TEMAS = {
         "etiqueta": "ECONOMÍA GLOBAL", "acento": GREEN, "corto": "ECONOMÍA", "nombre": "economía",
         "intro_voz": "Esto es lo que mueve hoy la economía.",
         "intro": ("Lo que mueve hoy", "la economía mundial"),
-        "hashtags": "#economia #noticias #finanzas #bolsa #inversion #mercados",
+        "hashtags": "#noticias #economia #finanzas #bursio",
         "texto": "La economía global que importa hoy, en poco más de un minuto.",
     },
     "internacional": {
         "etiqueta": "POLÍTICA INTERNACIONAL", "acento": BLUE, "corto": "POLÍTICA MUNDIAL", "nombre": "política internacional",
         "intro_voz": "Esto es lo más importante de la política internacional hoy.",
         "intro": ("Lo que importa hoy", "en el mundo"),
-        "hashtags": "#noticias #politica #actualidad #internacional #geopolitica",
+        "hashtags": "#noticias #internacional #geopolitica #bursio",
         "texto": "La política internacional que importa hoy, en poco más de un minuto.",
     },
     "deporte": {
         "etiqueta": "DEPORTES", "acento": GOLD, "corto": "DEPORTES", "nombre": "deportes",
         "intro_voz": "Deportes: lo que importa hoy.",
         "intro": ("Lo que importa hoy", "en el deporte"),
-        "hashtags": "#noticias #deportes #actualidad #futbol #deporte",
+        "hashtags": "#noticias #deportes #futbol #bursio",
         "texto": "Lo que importa hoy en el deporte, en poco más de un minuto.",
     },
 }
@@ -275,17 +275,17 @@ def escena_intro(tema):
         put(im, t2, W // 2, 745, 1.0, z, anchor="ct")
     return dib
 
-def escena_cta(im, lt, L):
-    a, y = appear(lt, 0.0, 0.4); put(im, text_img("Esto es", 600, 52, MUTED), W // 2, 520 + y, a, anchor="ct")
-    p = clamp((lt - 0.15) / 0.5); put(im, text_img("Bursio", "p800", 200, CREAM), W // 2, 600, ease(p), 0.9 + 0.1 * back(p), anchor="ct")
-    p = clamp((lt - 1.2) / 0.4)
+def escena_cta(im, lt, L, pregunta=""):
+    import estilo as E
+    if pregunta:
+        a, y = appear(lt, 0.0, 0.4); put(im, E.titular_serif(pregunta, 96), W // 2, 430 + y, a, anchor="ct")
+        p = clamp((lt - 0.8) / 0.4)
+        if p > 0: put(im, text_img("Te leo en comentarios", 700, 52, GOLD2), W // 2, 900 + (1 - ease(p)) * 30, ease(p), anchor="ct")
+    p = clamp((lt - 1.6) / 0.5)
     if p > 0:
-        put(im, text_img("Lo que importa,", 600, 60, CREAM), W // 2, 900 + (1 - ease(p)) * 40, ease(p), anchor="ct")
-        put(im, text_img("cada mañana en tu correo", 600, 60, GOLD2), W // 2, 985 + (1 - ease(p)) * 40, ease(p), anchor="ct")
-    p = clamp((lt - 2.6) / 0.4)
-    if p > 0:
-        put(im, chip("bursio.org", GOLD, 58, pad=(48, 24)), W // 2, 1150, ease(p), back(p) * (1 + 0.04 * math.sin(lt * 5)), anchor="ct")
-        put(im, text_img("Síguenos para no perderte nada", 600, 38, MUTED), W // 2, 1320, ease(p), anchor="ct")
+        put(im, text_img("Bursio", "p800", 120, CREAM), W // 2, 1080, ease(p), anchor="ct")
+        put(im, text_img("Cada mañana, lo que importa", 600, 46, CREAM), W // 2, 1240, ease(p), anchor="ct")
+        put(im, chip("bursio.org", GOLD, 54, pad=(44, 22)), W // 2, 1330, ease(p), back(p) * (1 + 0.04 * math.sin(lt * 5)), anchor="ct")
 
 # ───────────────────────── montaje ─────────────────────────
 def montar(tema, segmentos, fecha, carpeta):
@@ -310,6 +310,11 @@ def montar(tema, segmentos, fecha, carpeta):
     for d in durs[:-1]: cuts.append(round(cuts[-1] + LEAD + d + GAP, 2))
     DUR = round(cuts[-1] + LEAD + durs[-1] + 1.6, 2); cuts.append(DUR)
     fotos = [E.fotos_de(x) for x in items]
+    # Nunca una noticia sin foto: si Apps Script no trajo ninguna, se reutiliza la de otra noticia.
+    for i in range(n):
+        if not fotos[i]:
+            otra = next((f for f in fotos[i - 1::-1] + fotos[i + 1:] if f), None)
+            if otra: fotos[i] = [otra[-1]]
     print(tema, "fotos por noticia:", [len(f) for f in fotos], flush=True)
     # pista de voz + tiempos de cada palabra + cortes de foto
     v = np.zeros(int(DUR * SR) + SR, np.float32)
@@ -332,12 +337,15 @@ def montar(tema, segmentos, fecha, carpeta):
         fx[i0:i0 + len(w)] += w[:len(fx) - i0]
     sf.write(f"{carpeta}/fx.wav", fx[:int(DUR * SR)], SR)
     subprocess.run([sys.executable, "musica.py", ",".join(str(c) for c in cuts[1:-1]), str(DUR), f"{carpeta}/musica.wav"], check=True, stdout=subprocess.DEVNULL)
-    titulares = [E.caja_titular(E.titular_corto(limpiar(x.get("titulo")))) for x in items]
+    titulares = [E.titular_serif(limpiar(x.get("corto")) or E.titular_corto(limpiar(x.get("titulo")))) for x in items]
     def cred(x, c): return E.credito_img(" · ".join(z for z in [("Fuente: " + x["fuente"]) if x.get("fuente") else "", c] if z))
     creditos = [[cred(x, c) for _, c in fotos[i]] or [cred(x, "")] for i, x in enumerate(items)]
-    marcas = [E.etiqueta(f"{i + 1}/{n}" + (f" · {x['fuente'].upper()}" if x.get("fuente") else ""), size=34) for i, x in enumerate(items)]
-    marca_bursio = text_img("Bursio", "p700", 46, CREAM)
+    marca_bursio = text_img("Bursio", "p700", 40, CREAM)
     d0 = datetime.date.fromisoformat(fecha)
+    MES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    fecha_txt = f"{d0.day} de {MES_L[d0.month - 1]}"
+    capa_portada = E.portada(cfg["nombre"], fecha_txt)
+    pregunta = cierre[0].get("pregunta", "")
     et_intro = E.etiqueta(f"{cfg['etiqueta']} · {d0.day} {MESES[d0.month - 1]}", size=52)
     intro_dib = escena_intro(tema)
 
@@ -352,23 +360,33 @@ def montar(tema, segmentos, fecha, carpeta):
         elif j < n:
             k = sum(1 for c in cortes[i] if lt >= c)
             t0 = max([0.0] + [c for c in cortes[i] if lt >= c])
-            if fotos[j]:
+            if fotos[j] and j == 0 and not off and lt < 1.4 and fotos[0][0][0]["modo"] == "fit":
+                # en la portada, la primera foto a pantalla completa
+                bg = fotos[0][0][0]["full"].convert("RGBA")
+                bg.alpha_composite(E.sombra())
+            elif fotos[j]:
                 bg = E.encuadre(fotos[j][min(k, len(fotos[j]) - 1)][0], lt, t0).convert("RGBA")
                 bg.alpha_composite(E.sombra())
             else:
                 bg = background(t, cfg["acento"])
-            put(bg, marca_bursio, 70, 96, 0.9)
-            a = ease(lt / 0.2)
-            put(bg, marcas[j], 70, 250, a)
-            put(bg, titulares[j], 50, 330 + (1 - a) * 30, a)
+            put(bg, marca_bursio, W // 2, 90, 0.8, anchor="ct")
             fit = bool(fotos[j]) and fotos[j][min(k, len(fotos[j]) - 1)][0]["modo"] == "fit"
-            E.dibujar_subs(bg, lt, subs[i], y=1500 if fit else 1210)
-            put(bg, creditos[j][min(k, len(creditos[j]) - 1)], 70, 1745, 0.85)
+            if j == 0 and not off and lt < 1.4:
+                # portada: 'Tus noticias + fecha' sobre la primera foto (también es la miniatura)
+                ap = 1.0 if lt < 1.0 else 1 - ease((lt - 1.0) / 0.4)
+                pc = capa_portada if ap >= 0.999 else capa_portada.copy()
+                if ap < 0.999: pc.putalpha(pc.getchannel("A").point(lambda v: int(v * ap)))
+                bg.alpha_composite(pc)
+                t_in = 1.1
+            else:
+                t_in = 0.0
+            a = ease((lt - t_in) / 0.25)
+            put(bg, titulares[j], 50, 230 + (1 - a) * 30, a)
+            if lt >= t_in: E.dibujar_subs(bg, lt, subs[i], y=1500 if fit else 1210)
+            put(bg, creditos[j][min(k, len(creditos[j]) - 1)], 70, 1835, 0.55)
         else:
             bg = background(t, GOLD)
-            escena_cta(bg, lt, durs[i])
-        dd = ImageDraw.Draw(bg)
-        dd.rectangle([0, 0, W, 8], fill=(255, 255, 255, 40)); dd.rectangle([0, 0, int(W * t / DUR), 8], fill=E.AMARILLO)
+            escena_cta(bg, lt, durs[i], pregunta)
         if t > DUR - 0.5: bg.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, int(255 * (t - (DUR - 0.5)) / 0.5))))
         return bg.convert("RGB")
 
@@ -391,7 +409,7 @@ def montar(tema, segmentos, fecha, carpeta):
                     "-movflags", "+faststart", final], check=True)
     t1 = E.titular_corto(limpiar(items[0].get("titulo")))
     return {"video": final, "duracion": DUR, "titulares": [x.get("titulo", "") for x in items],
-            "texto": f"Tus noticias en 60 segundos: {cfg['nombre']}. {t1}, y {n - 1} noticias más. Cada mañana, lo que importa: bursio.org {cfg['hashtags']} #bursio"}
+            "texto": f"Noticias de hoy, {fecha_txt}: {cfg['nombre']} en un minuto. {t1}, y {n - 1} noticias más. {pregunta} Cada mañana, lo que importa: bursio.org {cfg['hashtags']}".replace("  ", " ")}
 
 def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
