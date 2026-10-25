@@ -440,7 +440,7 @@ def montar(tema, segmentos, fecha, carpeta):
                     "[md][vm][fx]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]",
                     "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-shortest",
                     "-movflags", "+faststart", final], check=True)
-    t1 = E.titular_corto(limpiar(items[0].get("titulo")))
+    t1 = limpiar(items[0].get("corto")) or E.titular_corto(limpiar(items[0].get("titulo")))
     return {"video": final, "duracion": DUR, "titulares": [x.get("titulo", "") for x in items],
             "texto": f"Noticias de hoy, {fecha_txt}: {cfg['nombre']} en un minuto. {t1}, y {n - 1} noticias más. {pregunta} Cada mañana, lo que importa: bursio.org {cfg['hashtags']}".replace("  ", " ")}
 
