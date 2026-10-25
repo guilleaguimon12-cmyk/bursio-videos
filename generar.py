@@ -212,6 +212,20 @@ def audio_b64(b64, ruta):
     sf.write(ruta, a, sr)
     return len(a) / sr
 
+def audio_seg(x, ruta, primero=False):
+    """Voz de un bloque. Si viene frase a frase ('audios'), las une con pausas naturales."""
+    clips = [c for c in (x.get("audios") or []) if c]
+    if not clips: return audio_b64(x["audio"], ruta)
+    partes = []
+    for k, c in enumerate(clips):
+        r = ruta[:-4] + f"_{k}.wav"; audio_b64(c, r)
+        a, sr = sf.read(r, dtype="float32"); os.remove(r)
+        if sr != SR: a = np.interp(np.arange(int(len(a) * SR / sr)) * sr / SR, np.arange(len(a)), a).astype(np.float32)
+        partes.append(a)
+        if k < len(clips) - 1: partes.append(np.zeros(int((0.45 if primero and k == 0 else 0.35) * SR), np.float32))
+    a = np.concatenate(partes); sf.write(ruta, a, SR)
+    return len(a) / SR
+
 # ───────────────────────── escenas ─────────────────────────
 def kicker_title(im, lt, k, title):
     a, y = appear(lt, 0.0, 0.35, 40); put(im, text_img(k, 800, 36, GOLD), 80, 320 + y, a)
@@ -299,11 +313,11 @@ def montar(tema, segmentos, fecha, carpeta):
     durs = [audio_b64(intro[0]["audio"], f"{carpeta}/v0.wav")] if intro else []
     items = []
     for x in noticias:  # hasta 4 noticias
-        d = audio_b64(x["audio"], f"{carpeta}/v{len(durs)}.wav")
+        d = audio_seg(x, f"{carpeta}/v{len(durs)}.wav", primero=not items and not intro)
         if len(items) >= 4:  # 4 noticias como mucho
             break
         items.append(x); durs.append(d)
-    durs.append(audio_b64(cierre[0]["audio"], f"{carpeta}/v{len(durs)}.wav"))
+    durs.append(audio_seg(cierre[0], f"{carpeta}/v{len(durs)}.wav"))
     textos = [x.get("texto", "") for x in intro + items] + [cierre[0].get("texto", "")]
     n = len(items)
     cuts = [0.0]
