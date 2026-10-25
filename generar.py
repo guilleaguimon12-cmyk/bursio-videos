@@ -379,10 +379,14 @@ def montar(tema, segmentos, fecha, carpeta):
         i = max(k for k in range(len(cuts) - 1) if cuts[k] <= t)
         lt = t - cuts[i]; j = i - off
         if off and i == 0:
-            bg = background(t, cfg["acento"])
-            put(bg, marca_bursio, 70, 96, 0.9)
-            put(bg, et_intro, W // 2, 960, 1.0, 1 + 0.05 * back(clamp(lt / 0.4)) - 0.05, anchor="ct")
-            intro_dib(bg, lt, durs[0] + LEAD + GAP)
+            # introducción hablada sobre la portada: foto de la noticia más importante + 'Tus noticias en 60 segundos'
+            f0 = fotos[0][0][0] if n and fotos[0] else None
+            if f0 is not None and f0["modo"] == "fit": bg = f0["full"].convert("RGBA")
+            elif f0 is not None: bg = E.encuadre(f0, lt, 0.0).convert("RGBA")
+            else: bg = background(t, cfg["acento"])
+            bg.alpha_composite(E.sombra())
+            put(bg, marca_bursio, W // 2, 90, 0.8, anchor="ct")
+            bg.alpha_composite(capa_portada)
         elif j < n:
             k = sum(1 for c in cortes[i] if lt >= c)
             t0 = max([0.0] + [c for c in cortes[i] if lt >= c])
