@@ -318,13 +318,14 @@ def montar(tema, segmentos, fecha, carpeta):
     print(tema, "fotos por noticia:", [len(f) for f in fotos], flush=True)
     # pista de voz + tiempos de cada palabra + cortes de foto
     v = np.zeros(int(DUR * SR) + SR, np.float32)
-    subs, cortes = [], []
+    subs, cortes, tws = [], [], []
     for i, st in enumerate(cuts[:-1]):
         a, sr = sf.read(f"{carpeta}/v{i}.wav", dtype="float32")
         if sr != SR: a = np.interp(np.arange(int(len(a) * SR / sr)) * sr / SR, np.arange(len(a)), a).astype(np.float32)
         i0 = int((st + LEAD) * SR); v[i0:i0 + len(a)] += a[:len(v) - i0]
         tw = [(w, x + LEAD, y + LEAD) for w, x, y in E.tiempos(a, SR, textos[i])]
         subs.append(E.trozos(tw))
+        tws.append(tw)
         j = i - off
         cortes.append(E.cortes(tw, len(fotos[j])) if 0 <= j < n else [])
     v = v[:int(DUR * SR)]; v /= max(1e-6, np.abs(v).max()) / 0.9
@@ -340,6 +341,17 @@ def montar(tema, segmentos, fecha, carpeta):
     titulares = [E.titular_serif(limpiar(x.get("corto")) or E.titular_corto(limpiar(x.get("titulo")))) for x in items]
     def cred(x, c): return E.credito_img(" · ".join(z for z in [("Fuente: " + x["fuente"]) if x.get("fuente") else "", c] if z))
     creditos = [[cred(x, c) for _, c in fotos[i]] or [cred(x, "")] for i, x in enumerate(items)]
+    cifras = {}
+    for j, x in enumerate(items):
+        tx = re.sub(r"(\d+) coma (\d+)", r"\1,\2", x.get("texto", ""))
+        m = NUM.search(tx)
+        if not m: continue
+        lead = re.match(r"\d+", m.group(0).lstrip("−-")).group(0)
+        t_w = next((a for w, a, b in tws[j + off] if re.sub(r"\D", "", w).startswith(lead)), None)
+        if t_w is None: continue
+        c = cifra({"titulo": tx}) or m.group(0)
+        cifras[j] = (E.cifra_grande(c, tendencia(x)), max(0.4, t_w - 0.1))
+    print(tema, "cifras:", {j: round(v[1], 1) for j, v in cifras.items()}, flush=True)
     marca_bursio = text_img("Bursio", "p700", 40, CREAM)
     d0 = datetime.date.fromisoformat(fecha)
     MES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -360,7 +372,7 @@ def montar(tema, segmentos, fecha, carpeta):
         elif j < n:
             k = sum(1 for c in cortes[i] if lt >= c)
             t0 = max([0.0] + [c for c in cortes[i] if lt >= c])
-            if fotos[j] and j == 0 and not off and lt < 1.4 and fotos[0][0][0]["modo"] == "fit":
+            if fotos[j] and j == 0 and not off and lt < 0.6 and fotos[0][0][0]["modo"] == "fit":
                 # en la portada, la primera foto a pantalla completa
                 bg = fotos[0][0][0]["full"].convert("RGBA")
                 bg.alpha_composite(E.sombra())
@@ -371,17 +383,20 @@ def montar(tema, segmentos, fecha, carpeta):
                 bg = background(t, cfg["acento"])
             put(bg, marca_bursio, W // 2, 90, 0.8, anchor="ct")
             fit = bool(fotos[j]) and fotos[j][min(k, len(fotos[j]) - 1)][0]["modo"] == "fit"
-            if j == 0 and not off and lt < 1.4:
-                # portada: 'Tus noticias + fecha' sobre la primera foto (también es la miniatura)
-                ap = 1.0 if lt < 1.0 else 1 - ease((lt - 1.0) / 0.4)
+            if j == 0 and not off and lt < 0.6:
+                # portada de medio segundo (también es la miniatura); la voz arranca ya con la noticia
+                ap = 1.0 if lt < 0.35 else 1 - ease((lt - 0.35) / 0.25)
                 pc = capa_portada if ap >= 0.999 else capa_portada.copy()
                 if ap < 0.999: pc.putalpha(pc.getchannel("A").point(lambda v: int(v * ap)))
                 bg.alpha_composite(pc)
-                t_in = 1.1
+                t_in = 0.3
             else:
                 t_in = 0.0
             a = ease((lt - t_in) / 0.25)
             put(bg, titulares[j], 50, 230 + (1 - a) * 30, a)
+            if j in cifras and cifras[j][1] <= lt < cifras[j][1] + 2.8:
+                ct = lt - cifras[j][1]; ac = min(ease(ct / 0.25), 1 - ease((ct - 2.55) / 0.25))
+                put(bg, cifras[j][0], W // 2, 700, ac, 0.85 + 0.15 * back(clamp(ct / 0.35)), anchor="ct")
             if lt >= t_in: E.dibujar_subs(bg, lt, subs[i], y=1500 if fit else 1210)
             put(bg, creditos[j][min(k, len(creditos[j]) - 1)], 70, 1835, 0.55)
         else:

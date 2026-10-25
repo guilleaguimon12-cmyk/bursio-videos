@@ -299,3 +299,22 @@ def portada(seccion, fecha_txt):
     t3 = _sombra_texto(text_img(seccion.upper(), 800, 40, (255, 255, 255), align="center", maxw=1000), blur=8)
     put(capa, t1, W // 2, 610, anchor="ct"); put(capa, t2, W // 2, 800, anchor="ct"); put(capa, t3, W // 2, 940, anchor="ct")
     return capa
+
+def cifra_grande(txt, tend=None):
+    """El dato clave de la noticia en grande (verde si sube, rojo si baja, dorado si no se sabe)."""
+    from plantilla import play
+    col = (120, 230, 150) if tend == "sube" else (255, 120, 105) if tend == "baja" else GOLD2
+    sz = 230
+    while sz > 110 and play(800, sz).getlength(txt) > W - 260: sz -= 15
+    num = text_img(txt, "p800", sz, col, align="center", maxw=W - 120)
+    fl = 0 if not tend else int(sz * 0.45)
+    pw, ph = num.width + fl + (40 if fl else 0) + 120, num.height + 90
+    panel = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
+    ImageDraw.Draw(panel).rounded_rectangle((0, 0, pw - 1, ph - 1), radius=40, fill=(0, 0, 0, 165))
+    x = 60
+    if fl:
+        d = ImageDraw.Draw(panel); cy = ph // 2; s = fl
+        pts = [(x, cy + s // 2), (x + s, cy + s // 2), (x + s // 2, cy - s // 2)] if tend == "sube" else [(x, cy - s // 2), (x + s, cy - s // 2), (x + s // 2, cy + s // 2)]
+        d.polygon(pts, fill=col); x += s + 40
+    panel.alpha_composite(num, (x, (ph - num.height) // 2))
+    return _sombra_texto(panel, blur=18)
