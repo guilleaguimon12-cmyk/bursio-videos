@@ -293,13 +293,13 @@ def titular_serif(texto, size=112):
     return _sombra_texto(text_img(texto, "p800", sz, (255, 255, 255), maxw=W - 160, lh=1.05))
 
 def portada(seccion, fecha_txt):
-    """Portada (también miniatura): 'Tus noticias' + fecha en serif sobre la primera foto."""
+    """Portada de la serie (también miniatura): 'Tus noticias en 60 segundos' + sección y fecha, sobre la primera foto."""
     capa = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    capa.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, 90)))
+    capa.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, 120)))
     t1 = _sombra_texto(text_img("Tus noticias", "p800", 150, (255, 255, 255), align="center", maxw=1000), blur=14)
-    t2 = _sombra_texto(text_img(fecha_txt, "p700", 84, GOLD2, align="center", maxw=1000), blur=12)
-    t3 = _sombra_texto(text_img(seccion.upper(), 800, 40, (255, 255, 255), align="center", maxw=1000), blur=8)
-    put(capa, t1, W // 2, 610, anchor="ct"); put(capa, t2, W // 2, 800, anchor="ct"); put(capa, t3, W // 2, 940, anchor="ct")
+    t2 = _sombra_texto(text_img("en 60 segundos", "p800", 118, GOLD2, align="center", maxw=1000), blur=14)
+    t3 = etiqueta(f"{seccion.upper()} · {fecha_txt.upper()}", size=44)
+    put(capa, t1, W // 2, 560, anchor="ct"); put(capa, t2, W // 2, 740, anchor="ct"); put(capa, t3, W // 2, 930, anchor="ct")
     return capa
 
 def cifra_grande(txt, tend=None):
