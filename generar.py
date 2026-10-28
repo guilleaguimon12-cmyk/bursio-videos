@@ -24,7 +24,7 @@ from plantilla import (W, H, FPS, GOLD, GOLD2, CREAM, MUTED, RED, GREEN, BLUE, c
                        icon_eu, arrow, footer, inter)
 
 SR = 44100
-LEAD, GAP = 0.3, 1.0
+LEAD, GAP = 0.25, 0.5
 VOZ = os.environ.get("VOZ", "es-ES-Chirp3-HD-Charon")
 OUT = "salida"
 MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
@@ -213,15 +213,25 @@ def audio_b64(b64, ruta):
     return len(a) / sr
 
 def audio_seg(x, ruta, primero=False):
-    """Voz de un bloque. Si viene frase a frase ('audios'), las une con pausas naturales."""
+    """Voz de un bloque. Si viene frase a frase ('audios'), las une con pausas naturales.
+    Una frase puede venir en trozos (lista) dichos a velocidades algo distintas: se unen con
+    micro pausas (más largas si el trozo acaba en punto)."""
     clips = [c for c in (x.get("audios") or []) if c]
     if not clips: return audio_b64(x["audio"], ruta)
+    textos = []
+    def leer(c, r):
+        audio_b64(c, r); a, sr = sf.read(r, dtype="float32"); os.remove(r)
+        if sr != SR: a = np.interp(np.arange(int(len(a) * SR / sr)) * sr / SR, np.arange(len(a)), a).astype(np.float32)
+        return a
     partes = []
     for k, c in enumerate(clips):
-        r = ruta[:-4] + f"_{k}.wav"; audio_b64(c, r)
-        a, sr = sf.read(r, dtype="float32"); os.remove(r)
-        if sr != SR: a = np.interp(np.arange(int(len(a) * SR / sr)) * sr / SR, np.arange(len(a)), a).astype(np.float32)
-        partes.append(a)
+        if isinstance(c, list):
+            sub = [leer(cc, ruta[:-4] + f"_{k}_{j}.wav") for j, cc in enumerate(c) if cc]
+            for j, a in enumerate(sub):
+                partes.append(a)
+                if j < len(sub) - 1: partes.append(np.zeros(int((0.16 if x.get('tipo') in ('intro', 'cierre') else 0.07) * SR), np.float32))
+        else:
+            partes.append(leer(c, ruta[:-4] + f"_{k}.wav"))
         if k < len(clips) - 1: partes.append(np.zeros(int((0.45 if primero and k == 0 else 0.35) * SR), np.float32))
     a = np.concatenate(partes); sf.write(ruta, a, SR)
     return len(a) / SR
@@ -310,7 +320,7 @@ def montar(tema, segmentos, fecha, carpeta):
     cierre = [x for x in segmentos if x.get("tipo") == "cierre"][:1]
     noticias = [x for x in segmentos if x.get("tipo") == "noticia"]
     off = len(intro)
-    durs = [audio_b64(intro[0]["audio"], f"{carpeta}/v0.wav")] if intro else []
+    durs = [audio_seg(intro[0], f"{carpeta}/v0.wav")] if intro else []
     items = []
     for x in noticias:  # hasta 4 noticias
         d = audio_seg(x, f"{carpeta}/v{len(durs)}.wav", primero=not items and not intro)
@@ -322,7 +332,7 @@ def montar(tema, segmentos, fecha, carpeta):
     n = len(items)
     cuts = [0.0]
     for d in durs[:-1]: cuts.append(round(cuts[-1] + LEAD + d + GAP, 2))
-    DUR = round(cuts[-1] + LEAD + durs[-1] + 1.6, 2); cuts.append(DUR)
+    DUR = round(cuts[-1] + LEAD + durs[-1] + 1.2, 2); cuts.append(DUR)
     fotos = [E.fotos_de(x) for x in items]
     # Nunca una noticia sin foto: si Apps Script no trajo ninguna, se reutiliza la de otra noticia.
     for i in range(n):
@@ -366,6 +376,10 @@ def montar(tema, segmentos, fecha, carpeta):
         c = cifra({"titulo": tx}) or m.group(0)
         cifras[j] = (E.cifra_grande(c, tendencia(x)), max(0.4, t_w - 0.1))
     print(tema, "cifras:", {j: round(v[1], 1) for j, v in cifras.items()}, flush=True)
+    for j, (_, tc) in cifras.items():  # 'pop' suave cuando aparece la cifra grande
+        pp = E.pop(SR); i0 = int((cuts[j + off] + tc) * SR)
+        fx[i0:i0 + len(pp)] += pp[:max(0, len(fx) - i0)]
+    sf.write(f"{carpeta}/fx.wav", fx[:int(DUR * SR)], SR)
     marca_bursio = text_img("Bursio", "p700", 40, CREAM)
     d0 = datetime.date.fromisoformat(fecha)
     MES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -421,6 +435,7 @@ def montar(tema, segmentos, fecha, carpeta):
                 put(bg, cifras[j][0], W // 2, 700, ac, 0.85 + 0.15 * back(clamp(ct / 0.35)), anchor="ct")
             if lt >= t_in: E.dibujar_subs(bg, lt, subs[i], y=1500 if fit else 1210)
             put(bg, creditos[j][min(k, len(creditos[j]) - 1)], 70, 1835, 0.55)
+            E.barra_progreso(bg, j, n, clamp(lt / max(0.1, cuts[i + 1] - cuts[i])))
         else:
             bg = background(t, GOLD)
             escena_cta(bg, lt, durs[i], pregunta)
@@ -437,7 +452,7 @@ def montar(tema, segmentos, fecha, carpeta):
     p.stdin.close(); p.wait()
     final = f"{OUT}/{tema}.mp4"
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", mudo, "-i", f"{carpeta}/musica.wav", "-i", f"{carpeta}/voz.wav", "-i", f"{carpeta}/fx.wav", "-filter_complex",
-                    f"[1:a]atrim=0:{DUR},afade=t=out:st={DUR - 1.5}:d=1.5,volume=0.3[m0];"
+                    f"[1:a]atrim=0:{DUR},afade=t=out:st={DUR - 1.5}:d=1.5,volume=0.36[m0];"
                     "[2:a]aformat=channel_layouts=stereo,highpass=f=70,acompressor=threshold=-20dB:ratio=2:attack=8:release=120,asplit=2[vk][vm];"
                     "[m0][vk]sidechaincompress=threshold=0.05:ratio=4:attack=20:release=300[md];"
                     "[3:a]aformat=channel_layouts=stereo,volume=0.55[fx];"

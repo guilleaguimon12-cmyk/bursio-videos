@@ -262,6 +262,26 @@ def cortes(tw, n):
         if (not out or t - out[-1] > 1.2) and t - ini > 1.0 and fin - t > 1.0: out.append(t)
     return out
 
+def pop(sr, dur=0.12):
+    """'Pop' corto y suave para cuando aparece un dato en pantalla."""
+    t = np.arange(int(sr * dur), dtype=np.float32) / sr
+    f = 900 * np.exp(-t * 18) + 300
+    y = np.sin(2 * np.pi * np.cumsum(f) / sr) * np.exp(-t * 35)
+    return (y / (np.abs(y).max() + 1e-9) * 0.45).astype(np.float32)
+
+def barra_progreso(im, k, n, frac):
+    """Barra de progreso segmentada arriba (una por noticia): engancha a ver la siguiente."""
+    from PIL import ImageDraw
+    capa = Image.new("RGBA", (W, 60), (0, 0, 0, 0))
+    d = ImageDraw.Draw(capa); x0, y0, gap, h = 50, 34, 12, 7
+    w = (W - 2 * x0 - gap * (n - 1)) / n
+    for i in range(n):
+        x = x0 + i * (w + gap)
+        d.rounded_rectangle([x, y0, x + w, y0 + h], radius=3, fill=(255, 255, 255, 70))
+        p = 1.0 if i < k else (frac if i == k else 0.0)
+        if p > 0: d.rounded_rectangle([x, y0, x + max(h, w * p), y0 + h], radius=3, fill=GOLD2 + (255,))
+    im.alpha_composite(capa)
+
 def whoosh(sr, dur=0.45, semilla=0):
     """Barrido de ruido tipo 'swish' (sintetizado, sin derechos)."""
     rng = np.random.default_rng(semilla)

@@ -1,5 +1,5 @@
 """Música de fondo original (sintetizada) + efectos para el vídeo de Bursio.
-Lo-fi suave a 96 bpm: pad de acordes, bajo, piano, bombo y charles.
+Estilo noticias, 128 bpm: bajo pulsante, staccatos, bombo a negras, palmas y charles.
 Efectos: whoosh en cada cambio de escena e impacto en el gancho."""
 import numpy as np, wave, sys, os
 
@@ -32,45 +32,65 @@ def add(buf, x, start):
 def hz(m): return 440 * 2 ** ((m - 69) / 12)
 
 music = np.zeros(N, np.float32)
-# Am7 - Fmaj7 - Cmaj7 - G6 (dos compases cada uno = 8 tiempos)
-prog = [[57, 60, 64, 67], [53, 57, 60, 64], [48, 55, 59, 64], [55, 59, 62, 64]]
-roots = [45, 41, 48, 43]
+# Estilo "breaking news" de los vídeos de noticias: 128 bpm, menor, bajo pulsante en semicorcheas,
+# staccatos tipo cuerda, bombo a negras, palmas en 2 y 4, charles en semicorcheas tipo "tic-tac".
+BPM = 128; BEAT = 60 / BPM; S16 = BEAT / 4
+prog = [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 56, 59]]   # Am - F - G - E
+roots = [33, 29, 31, 28]
 bar = 4 * BEAT
-chord_len = 2 * bar
+def stab(f, amp):
+    n = int(0.16*SR); t = np.arange(n)/SR
+    w = sum(np.sign(np.sin(2*np.pi*f*d*t))*0.5 + np.sin(2*np.pi*f*d*t)*0.5 for d in (1, 1.004, 0.996)) / 3
+    return (w * np.exp(-t*22) * amp).astype(np.float32)
+def sub(f, dur, amp):
+    n = int(dur*SR); t = np.arange(n)/SR
+    w = np.sin(2*np.pi*f*t) + 0.35*np.sign(np.sin(2*np.pi*f*t))
+    return (w * np.minimum(1, t/0.004) * np.exp(-t*9) * amp).astype(np.float32)
 k = 0; t0 = 0.0
 while t0 < DUR:
     ch = prog[k % 4]
-    for m in ch: add(music, note(hz(m), chord_len + 0.6, 0.05, "pad"), t0)
-    for b in range(8):  # bajo en 1 y 3
-        if b % 2 == 0: add(music, note(hz(roots[k % 4]), BEAT * 1.8, 0.16, "bass"), t0 + b * BEAT)
-    # arpegio de piano en corcheas, suave
-    arp = [ch[0] + 12, ch[2] + 12, ch[1] + 12, ch[3] + 12]
-    for s in range(16):
-        if rng.random() < 0.72:
-            add(music, note(hz(arp[s % 4]), 1.2, 0.045 + 0.02 * rng.random(), "pluck"), t0 + s * BEAT / 2)
-    k += 1; t0 += chord_len
+    for m in ch: add(music, note(hz(m), bar + 0.3, 0.025, "pad"), t0)
+    for s16 in range(16):
+        tt = t0 + s16 * S16
+        # bajo pulsante en semicorcheas, con acento en la corchea
+        add(music, sub(hz(roots[k % 4] + (12 if s16 % 8 == 6 else 0)), S16 * 0.95, 0.15 if s16 % 2 == 0 else 0.09), tt)
+        # staccatos (patrón sincopado)
+        if s16 in (0, 3, 6, 8, 11, 14):
+            for m in ch: add(music, stab(hz(m + 12), 0.035), tt)
+    # motivo agudo cada dos compases, sube la tensión
+    if k % 2 == 1:
+        for j, m in enumerate([ch[2] + 12, ch[1] + 12, ch[0] + 24, ch[2] + 12]):
+            add(music, note(hz(m), 0.3, 0.04, "pluck"), t0 + 2 * BEAT + j * BEAT / 2)
+    k += 1; t0 += bar
 
-# batería (entra a los 2 s, se va en el cierre)
 def kick():
-    n = int(0.35*SR); t = np.arange(n)/SR
-    f = 50 + 90*np.exp(-t*30)
-    return (np.sin(2*np.pi*np.cumsum(f)/SR) * np.exp(-t*9) * 0.5).astype(np.float32)
+    n = int(0.3*SR); t = np.arange(n)/SR
+    f = 48 + 110*np.exp(-t*35)
+    return (np.sin(2*np.pi*np.cumsum(f)/SR) * np.exp(-t*10) * 0.6).astype(np.float32)
 def hat(a):
-    n = int(0.06*SR); t = np.arange(n)/SR
+    n = int(0.04*SR); t = np.arange(n)/SR
     x = rng.standard_normal(n); x = np.diff(x, prepend=0)
-    return (x * np.exp(-t*70) * a).astype(np.float32)
-def snare():
-    n = int(0.25*SR); t = np.arange(n)/SR
-    x = rng.standard_normal(n) * np.exp(-t*22) * 0.16 + np.sin(2*np.pi*190*t)*np.exp(-t*30)*0.12
+    return (x * np.exp(-t*110) * a).astype(np.float32)
+def clap():
+    n = int(0.2*SR); t = np.arange(n)/SR
+    x = rng.standard_normal(n) * (np.exp(-t*30) + 0.6*np.exp(-np.abs(t-0.012)*400) + 0.5*np.exp(-np.abs(t-0.024)*400)) * 0.14
     return x.astype(np.float32)
+def riser(dur):
+    n = int(dur*SR); t = np.arange(n)/SR
+    x = rng.standard_normal(n).astype(np.float32); y = np.zeros(n, np.float32); p = 0.0
+    a = np.linspace(0.03, 0.5, n)
+    for i in range(n): p += a[i]*(x[i]-p); y[i] = p
+    return (y * (t/dur)**2 * 0.25).astype(np.float32)
 drums = np.zeros(N, np.float32)
-b = 0; tb = 2.5
-while tb < DUR - 4.5:
-    if b % 4 in (0,): add(drums, kick(), tb)
-    if b % 4 == 2: add(drums, kick()*0.8, tb + BEAT*0.5)
-    if b % 4 in (1, 3): add(drums, snare(), tb)
-    add(drums, hat(0.05), tb); add(drums, hat(0.03), tb + BEAT/2)
+b = 0; tb = 0.0
+while tb < DUR - 2.0:
+    add(drums, kick(), tb)
+    if b % 2 == 1: add(drums, clap(), tb)
+    for q in range(4): add(drums, hat(0.05 if q == 2 else 0.025), tb + q * S16)
     b += 1; tb += BEAT
+# pequeño 'riser' antes de cada cambio de noticia
+for c in ([float(x) for x in sys.argv[1].split(",")] if len(sys.argv) > 1 and sys.argv[1] else []):
+    if c > 1.2: add(drums, riser(1.0), c - 1.0)
 
 # efectos
 fx = np.zeros(N, np.float32)
