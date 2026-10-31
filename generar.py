@@ -261,21 +261,25 @@ def audio_seg(x, ruta, primero=False):
             t = _suav(TEMPO_FRASE[k % len(TEMPO_FRASE)] + _jit(semilla, k, 0.025))
             p = _suav(TONO_FRASE[k % len(TONO_FRASE)] + _jit(semilla, k + 50, 0.006))
         elif RITMO and tipo == "cierre":
-            t, p = (_suav(0.94), _suav(1.012)) if k == 0 else (1.0, _suav(0.995))   # la pregunta, más despacio
+            t, p = 1.04, 1.0   # cierre ágil y natural, sin frenar (31 oct)
         else:
             t, p = 1.0, 1.0
         for j, a in enumerate(sub):
             ult = j == len(sub) - 1
             # el último trozo de la frase se alarga un poco, como al hablar
-            a = prosodia(a, t * (_suav(0.96) if (ult and len(sub) > 1) else 1.0), p * (_suav(0.99) if ult else 1.0)) if RITMO else a
+            # sin alargar ni bajar el tono al final de frase: sonaba forzado (31 oct)
+            tj = t * (1.08 if (tipo == 'cierre' and ult and len(sub) > 1) else 1.0)  # 'bursio punto o erre ge' de corrido
+            a = prosodia(a, tj, p) if RITMO else a
             partes.append(a)
             if not ult:
-                base = 0.16 if tipo in ('intro', 'cierre') else 0.07
-                partes.append(calla(base + (0.09 + _jit(semilla, k * 10 + j, 0.05) if RITMO else 0)))
+                if RITMO and tipo == 'cierre': partes.append(calla(0.35 if j == 0 else 0.10))  # tras la pregunta, respiro corto; luego seguido
+                else:
+                    base = 0.16 if tipo in ('intro', 'cierre') else 0.07
+                    partes.append(calla(base + (0.09 + _jit(semilla, k * 10 + j, 0.05) if RITMO else 0)))
         if k < len(clips) - 1:
             if not RITMO: pausa = 0.45 if primero and k == 0 else 0.35
             elif tipo == "noticia": pausa = (0.58 if k == 0 else 0.40) + _jit(semilla, k + 99, 0.08)
-            elif tipo == "cierre": pausa = 0.70
+            elif tipo == "cierre": pausa = 0.35
             else: pausa = 0.45 if primero and k == 0 else 0.38
             partes.append(calla(pausa))
     a = np.concatenate(partes); sf.write(ruta, a, SR)
@@ -377,7 +381,7 @@ def montar(tema, segmentos, fecha, carpeta):
     n = len(items)
     cuts = [0.0]
     for d in durs[:-1]: cuts.append(round(cuts[-1] + LEAD + d + GAP, 2))
-    DUR = round(cuts[-1] + LEAD + durs[-1] + 1.2, 2); cuts.append(DUR)
+    DUR = round(cuts[-1] + LEAD + durs[-1] + 0.6, 2); cuts.append(DUR)
     fotos = [E.fotos_de(x) for x in items]
     # Nunca una noticia sin foto: si Apps Script no trajo ninguna, se reutiliza la de otra noticia.
     for i in range(n):
