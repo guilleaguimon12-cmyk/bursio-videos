@@ -30,8 +30,12 @@ Es un vídeo sobre un único tema, contado en partes.
 - **Título de YouTube:** "{Titular}: qué está pasando, explicado en 1 minuto"
 
 ## Reglas comunes
-- **Fotos:** siempre hay foto; los lugares llevan etiqueta.
-  - Nunca personas reconocibles, logos, mapas, tiendas ni recortes antiguos.
+- **Fotos (regla del 31 de octubre, sustituye a la anterior):** siempre específicas del tema; nada genérico. Por ejemplo, nada de un avión para hablar de Corea del Norte ni de un skyline cualquiera de Abu Dabi.
+  - **Empresa:** su logo (Binance → logo de Binance).
+  - **País:** su bandera y además algo propio y reconocible del país.
+  - **Cripto:** su logo (bitcoin → logo de bitcoin).
+  - **Lugares y edificios:** con etiqueta.
+  - **Nunca:** personas reconocibles, tiendas ni recortes antiguos.
   - Revisar los fotogramas antes de publicar.
 - **Decimales:** se dicen con "coma". La web se dice "bursio punto o erre ge".
 - **Hashtags:** los genéricos primero y uno o dos específicos al final.
