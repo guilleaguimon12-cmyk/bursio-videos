@@ -34,6 +34,8 @@ Es un vídeo sobre un único tema, contado en partes.
   - **Empresa:** su logo (Binance → logo de Binance).
   - **País:** su bandera y además algo propio y reconocible del país.
   - **Cripto:** su logo (bitcoin → logo de bitcoin).
+  - **Cómo se pide un logo o una bandera en el Apps Script:** en `fotos` se pone el archivo de Commons con "File:" delante (por ejemplo "File:Binance Logo.svg", "File:Bitcoin.svg" o "File:Flag of North Korea.svg"). El vídeo los muestra enteros, sin recortar.
+  - **País:** siempre algo emblemático, como la Torre Juche para Corea del Norte.
   - **Lugares y edificios:** con etiqueta.
   - **Nunca:** personas reconocibles, tiendas ni recortes antiguos.
   - Revisar los fotogramas antes de publicar.

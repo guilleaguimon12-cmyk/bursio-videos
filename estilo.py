@@ -30,7 +30,21 @@ def cargar_foto(f):
             print("No se pudo bajar la foto:", e, flush=True)
     if not datos: return None
     try:
-        im = Image.open(io.BytesIO(datos)).convert("RGB")
+        im0 = Image.open(io.BytesIO(datos))
+        logo = im0.mode in ("RGBA", "LA", "P") and "A" in im0.convert("RGBA").getbands() and im0.convert("RGBA").getchannel("A").getextrema()[0] < 250
+        if logo:
+            # Logo, bandera o icono con transparencia: entero, nunca recortado, con margen sobre fondo oscuro (31 oct)
+            a = im0.convert("RGBA"); a = a.crop(a.getbbox() or (0, 0, a.width, a.height))
+            caja_w, caja_h = int(W * 0.74), 560
+            k = min(caja_w / a.width, caja_h / a.height)
+            a = a.resize((max(1, int(a.width * k)), max(1, int(a.height * k))), Image.LANCZOS)
+            lienzo = Image.new("RGBA", (W, 820), (18, 18, 22, 255))
+            lienzo.alpha_composite(a, ((W - a.width) // 2, (820 - a.height) // 2))
+            fg = lienzo.convert("RGB")
+            bg = Image.new("RGBA", (W, H), (12, 12, 16, 255))
+            full = Image.new("RGB", (W, H), (12, 12, 16)); pq = fg.resize((W * 3 // 5, fg.height * 3 // 5), Image.LANCZOS); full.paste(pq, ((W - pq.width) // 2, H - pq.height - 120))  # en portada, debajo del título
+            return {"modo": "fit", "fg": fg, "bg": bg, "full": full, "logo": True}
+        im = im0.convert("RGB")
     except Exception:
         return None
     from PIL import ImageEnhance
