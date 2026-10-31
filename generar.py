@@ -237,6 +237,9 @@ def prosodia(a, tempo=1.0, tono=1.0):
 RITMO = os.environ.get("RITMO", "1") != "0"
 TEMPO_FRASE = [1.06, 0.95, 1.01, 0.97, 1.03]
 TONO_FRASE = [1.022, 0.988, 1.004, 0.992, 1.01]
+# 31 oct: Guille pidió suavizar las subidas y bajadas un 20 % (sonaba a onda)
+SUAVE = float(os.environ.get("RITMO_SUAVE", "0.8"))
+def _suav(x): return 1 + (x - 1) * SUAVE
 
 def audio_seg(x, ruta, primero=False):
     """Voz de un bloque. Si viene frase a frase ('audios'), las une con pausas naturales.
@@ -255,16 +258,16 @@ def audio_seg(x, ruta, primero=False):
     for k, c in enumerate(clips):
         sub = [leer(cc, ruta[:-4] + f"_{k}_{j}.wav") for j, cc in enumerate(c) if cc] if isinstance(c, list) else [leer(c, ruta[:-4] + f"_{k}.wav")]
         if RITMO and tipo == "noticia":
-            t = TEMPO_FRASE[k % len(TEMPO_FRASE)] + _jit(semilla, k, 0.025)
-            p = TONO_FRASE[k % len(TONO_FRASE)] + _jit(semilla, k + 50, 0.006)
+            t = _suav(TEMPO_FRASE[k % len(TEMPO_FRASE)] + _jit(semilla, k, 0.025))
+            p = _suav(TONO_FRASE[k % len(TONO_FRASE)] + _jit(semilla, k + 50, 0.006))
         elif RITMO and tipo == "cierre":
-            t, p = (0.94, 1.012) if k == 0 else (1.0, 0.995)   # la pregunta, más despacio
+            t, p = (_suav(0.94), _suav(1.012)) if k == 0 else (1.0, _suav(0.995))   # la pregunta, más despacio
         else:
             t, p = 1.0, 1.0
         for j, a in enumerate(sub):
             ult = j == len(sub) - 1
             # el último trozo de la frase se alarga un poco, como al hablar
-            a = prosodia(a, t * (0.96 if (RITMO and ult and len(sub) > 1) else 1.0), p * (0.99 if (RITMO and ult) else 1.0)) if RITMO else a
+            a = prosodia(a, t * (_suav(0.96) if (ult and len(sub) > 1) else 1.0), p * (_suav(0.99) if ult else 1.0)) if RITMO else a
             partes.append(a)
             if not ult:
                 base = 0.16 if tipo in ('intro', 'cierre') else 0.07
