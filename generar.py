@@ -430,7 +430,7 @@ def montar(tema, segmentos, fecha, carpeta):
     d0 = datetime.date.fromisoformat(fecha)
     MES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     fecha_txt = f"{d0.day} de {MES_L[d0.month - 1]}"
-    capa_portada = E.portada_unica(os.environ.get("UNICA_PORTADA") or UNICA, f"Explicado en 1 minuto · {fecha_txt}") if UNICA else E.portada(cfg["nombre"], fecha_txt)
+    capa_portada = E.portada_unica(os.environ.get("UNICA_PORTADA") or UNICA, "Explicado en 1 minuto") if UNICA else E.portada(cfg["nombre"], fecha_txt)  # las individuales nunca llevan fecha
     pregunta = cierre[0].get("pregunta", "")
     et_intro = E.etiqueta(f"{cfg['etiqueta']} · {d0.day} {MESES[d0.month - 1]}", size=52)
     intro_dib = escena_intro(tema)

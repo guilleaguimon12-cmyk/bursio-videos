@@ -17,7 +17,7 @@ Son tres vídeos al día: economía, internacional y deportes.
 
 ## 2. Noticia individual explicada (una sola historia)
 Es un vídeo sobre un único tema, contado en partes.
-- **Portada:** el titular propio en grande y la etiqueta roja "EXPLICADO EN 1 MINUTO · día de mes". No lleva "Tus noticias en 60 segundos".
+- **Portada:** el titular propio en grande y la etiqueta roja "EXPLICADO EN 1 MINUTO", NUNCA con fecha (la fecha es solo para las generales). No lleva "Tus noticias en 60 segundos".
 - **Intro hablada:** frase propia que engancha. Ejemplo: "El Salvador ha mandado casi 2.000 soldados a Haití. Esto es lo que está pasando."
 - **Contenido:** hasta 5 partes. Arriba va siempre el título de la historia y debajo una etiqueta dorada con el apartado ("Qué ha pasado", "La emboscada", "Qué dice X"…).
 - **Comando:**
