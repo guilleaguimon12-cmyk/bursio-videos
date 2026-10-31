@@ -322,6 +322,27 @@ def portada(seccion, fecha_txt):
     put(capa, t1, W // 2, 560, anchor="ct"); put(capa, t2, W // 2, 740, anchor="ct"); put(capa, t3, W // 2, 930, anchor="ct")
     return capa
 
+def portada_unica(titulo, etiqueta_txt):
+    """Portada de un video de una sola noticia (explicativo): su propio titular grande + etiqueta."""
+    from plantilla import wrap, play
+    capa = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    capa.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, 125)))
+    for sz in (132, 120, 110, 100, 92):
+        if len(wrap(titulo, play(800, sz), W - 140)) <= 4: break
+    t1 = _sombra_texto(text_img(titulo, "p800", sz, (255, 255, 255), align="center", maxw=W - 140, lh=1.04), blur=14)
+    t3 = etiqueta(etiqueta_txt.upper(), size=44)
+    y = 860 - t1.height // 2
+    put(capa, t1, W // 2, y, anchor="ct"); put(capa, t3, W // 2, y + t1.height + 10, anchor="ct")
+    return capa
+
+def cabecera_unica(titulo, apartado):
+    """Arriba en cada parte de un video de una sola noticia: el titular fijo y, debajo, el apartado."""
+    t = titular_serif(titulo, size=84)
+    k = etiqueta(apartado.upper(), fondo=GOLD, color=(20, 20, 20), size=38)
+    im = Image.new("RGBA", (max(t.width, k.width + 30), t.height + k.height + 4), (0, 0, 0, 0))
+    im.alpha_composite(t, (0, 0)); im.alpha_composite(k, (30, t.height - 6))
+    return im
+
 def cifra_grande(txt, tend=None):
     """El dato clave de la noticia en grande (verde si sube, rojo si baja, dorado si no se sabe)."""
     from plantilla import play

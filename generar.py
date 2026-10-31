@@ -324,7 +324,7 @@ def montar(tema, segmentos, fecha, carpeta):
     items = []
     for x in noticias:  # hasta 4 noticias
         d = audio_seg(x, f"{carpeta}/v{len(durs)}.wav", primero=not items and not intro)
-        if len(items) >= 4:  # 4 noticias como mucho
+        if len(items) >= int(os.environ.get("MAX_NOTICIAS", "4")):  # 4 noticias como mucho (MAX_NOTICIAS para los explicativos)
             break
         items.append(x); durs.append(d)
     durs.append(audio_seg(cierre[0], f"{carpeta}/v{len(durs)}.wav"))
@@ -362,7 +362,11 @@ def montar(tema, segmentos, fecha, carpeta):
         fx[i0:i0 + len(w)] += w[:len(fx) - i0]
     sf.write(f"{carpeta}/fx.wav", fx[:int(DUR * SR)], SR)
     subprocess.run([sys.executable, "musica.py", ",".join(str(c) for c in cuts[1:-1]), str(DUR), f"{carpeta}/musica.wav"], check=True, stdout=subprocess.DEVNULL)
-    titulares = [E.titular_serif(limpiar(x.get("corto")) or E.titular_corto(limpiar(x.get("titulo")))) for x in items]
+    UNICA = os.environ.get("UNICA", "").strip()  # video de una sola noticia: su titulo fijo arriba
+    if UNICA:
+        titulares = [E.cabecera_unica(UNICA, limpiar(x.get("corto"))) for x in items]
+    else:
+        titulares = [E.titular_serif(limpiar(x.get("corto")) or E.titular_corto(limpiar(x.get("titulo")))) for x in items]
     def cred(x, c): return E.credito_img(" · ".join(z for z in [("Fuente: " + x["fuente"]) if x.get("fuente") else "", c] if z))
     creditos = [[cred(x, c) for _, c in fotos[i]] or [cred(x, "")] for i, x in enumerate(items)]
     cifras = {}
@@ -384,7 +388,7 @@ def montar(tema, segmentos, fecha, carpeta):
     d0 = datetime.date.fromisoformat(fecha)
     MES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     fecha_txt = f"{d0.day} de {MES_L[d0.month - 1]}"
-    capa_portada = E.portada(cfg["nombre"], fecha_txt)
+    capa_portada = E.portada_unica(os.environ.get("UNICA_PORTADA") or UNICA, f"Explicado en 1 minuto · {fecha_txt}") if UNICA else E.portada(cfg["nombre"], fecha_txt)
     pregunta = cierre[0].get("pregunta", "")
     et_intro = E.etiqueta(f"{cfg['etiqueta']} · {d0.day} {MESES[d0.month - 1]}", size=52)
     intro_dib = escena_intro(tema)
