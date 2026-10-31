@@ -14,6 +14,7 @@ ninguna clave.
 Variables de entorno: APPS_URL (URL /exec del Apps Script).
 Opcional: DATOS (json local para pruebas).
 """
+import hashlib
 import os, sys, re, json, math, time, base64, subprocess, datetime, urllib.request, io
 import numpy as np, soundfile as sf
 from PIL import Image, ImageDraw
@@ -212,27 +213,68 @@ def audio_b64(b64, ruta):
     sf.write(ruta, a, sr)
     return len(a) / sr
 
+def _jit(semilla, k, amp):
+    """Variación determinista (misma noticia -> mismo resultado) entre -amp y +amp."""
+    h = int(hashlib.md5(f"{semilla}|{k}".encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+    return (h * 2 - 1) * amp
+
+def prosodia(a, tempo=1.0, tono=1.0):
+    """Cambia velocidad y tono de un trozo de voz sin efecto ardilla (rubberband, formantes conservados)."""
+    if abs(tempo - 1) < 0.005 and abs(tono - 1) < 0.003: return a
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        i, o = f"{d}/i.wav", f"{d}/o.wav"
+        sf.write(i, a, SR)
+        r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", i, "-af",
+                            f"rubberband=tempo={tempo:.3f}:pitch={tono:.4f}:formant=preserved:transients=smooth", o])
+        if r.returncode: return a
+        b, _ = sf.read(o, dtype="float32")
+    return b
+
+# Ritmo humano: cada frase con su velocidad y su tono, y pausas que cambian.
+# La primera frase de una noticia va con energía (algo más rápida y aguda), la segunda baja,
+# el final de cada frase se alarga un poco y entre frases se respira de forma distinta.
+RITMO = os.environ.get("RITMO", "1") != "0"
+TEMPO_FRASE = [1.06, 0.95, 1.01, 0.97, 1.03]
+TONO_FRASE = [1.022, 0.988, 1.004, 0.992, 1.01]
+
 def audio_seg(x, ruta, primero=False):
     """Voz de un bloque. Si viene frase a frase ('audios'), las une con pausas naturales.
     Una frase puede venir en trozos (lista) dichos a velocidades algo distintas: se unen con
     micro pausas (más largas si el trozo acaba en punto)."""
     clips = [c for c in (x.get("audios") or []) if c]
     if not clips: return audio_b64(x["audio"], ruta)
-    textos = []
+    tipo = x.get("tipo")
+    semilla = (x.get("texto") or "")[:60]
     def leer(c, r):
         audio_b64(c, r); a, sr = sf.read(r, dtype="float32"); os.remove(r)
         if sr != SR: a = np.interp(np.arange(int(len(a) * SR / sr)) * sr / SR, np.arange(len(a)), a).astype(np.float32)
         return a
+    def calla(seg): return np.zeros(int(max(0.0, seg) * SR), np.float32)
     partes = []
     for k, c in enumerate(clips):
-        if isinstance(c, list):
-            sub = [leer(cc, ruta[:-4] + f"_{k}_{j}.wav") for j, cc in enumerate(c) if cc]
-            for j, a in enumerate(sub):
-                partes.append(a)
-                if j < len(sub) - 1: partes.append(np.zeros(int((0.16 if x.get('tipo') in ('intro', 'cierre') else 0.07) * SR), np.float32))
+        sub = [leer(cc, ruta[:-4] + f"_{k}_{j}.wav") for j, cc in enumerate(c) if cc] if isinstance(c, list) else [leer(c, ruta[:-4] + f"_{k}.wav")]
+        if RITMO and tipo == "noticia":
+            t = TEMPO_FRASE[k % len(TEMPO_FRASE)] + _jit(semilla, k, 0.025)
+            p = TONO_FRASE[k % len(TONO_FRASE)] + _jit(semilla, k + 50, 0.006)
+        elif RITMO and tipo == "cierre":
+            t, p = (0.94, 1.012) if k == 0 else (1.0, 0.995)   # la pregunta, más despacio
         else:
-            partes.append(leer(c, ruta[:-4] + f"_{k}.wav"))
-        if k < len(clips) - 1: partes.append(np.zeros(int((0.45 if primero and k == 0 else 0.35) * SR), np.float32))
+            t, p = 1.0, 1.0
+        for j, a in enumerate(sub):
+            ult = j == len(sub) - 1
+            # el último trozo de la frase se alarga un poco, como al hablar
+            a = prosodia(a, t * (0.96 if (RITMO and ult and len(sub) > 1) else 1.0), p * (0.99 if (RITMO and ult) else 1.0)) if RITMO else a
+            partes.append(a)
+            if not ult:
+                base = 0.16 if tipo in ('intro', 'cierre') else 0.07
+                partes.append(calla(base + (0.09 + _jit(semilla, k * 10 + j, 0.05) if RITMO else 0)))
+        if k < len(clips) - 1:
+            if not RITMO: pausa = 0.45 if primero and k == 0 else 0.35
+            elif tipo == "noticia": pausa = (0.58 if k == 0 else 0.40) + _jit(semilla, k + 99, 0.08)
+            elif tipo == "cierre": pausa = 0.70
+            else: pausa = 0.45 if primero and k == 0 else 0.38
+            partes.append(calla(pausa))
     a = np.concatenate(partes); sf.write(ruta, a, SR)
     return len(a) / SR
 
