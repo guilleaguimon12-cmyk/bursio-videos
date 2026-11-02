@@ -107,14 +107,24 @@ def primera_frase(item, maxpal=26):
     p = f.split()
     return f if len(p) <= maxpal else " ".join(p[:maxpal]).rstrip(",;:") + "…"
 
-NUM = re.compile(r"(−|-)?\d[\d.,]*\s?(%|por ciento|millones de euros|millones|mil millones|billones|€|euros|dólares)", re.I)
+NUM = re.compile(r"(−|-)?\d[\d.,]*\s?(%|por ciento|mil millones de (?:euros|dólares)|millones de (?:euros|dólares)|mil millones|millones|billones|€|euros|dólares)", re.I)
+def _miles(n):
+    """6300 -> 6.300 ; 28,6 se queda igual (2 nov: antes salía 15413 M)."""
+    return re.sub(r"\b(\d{4,})\b", lambda m: f"{int(m.group(1)):,}".replace(",", "."), n) if "," not in n else n
 def cifra(item):
     for txt in (item.get("titulo", ""), item.get("resumen", "")):
         m = NUM.search(txt or "")
         if m:
-            s = m.group(0).replace("por ciento", "%").replace("millones de euros", "M€").replace(" millones", " M")
-            s = s.replace("mil millones", "mil M").replace(" euros", " €").replace("dólares", "$")
-            return s.replace("-", "−").strip()
+            num = re.match(r"[−-]?[\d.,]*\d", m.group(0)).group(0).replace(".", "")
+            num = _miles(num.lstrip("−-")); neg = m.group(0)[:1] in "−-"
+            u = m.group(2).lower()
+            mon = "€" if "euro" in u or u == "€" else "$" if "dólar" in u else ""
+            if u in ("%", "por ciento"): suf = " %"
+            elif u.startswith("mil millones"): suf = " mil M" + mon
+            elif u.startswith("millones"): suf = " M" + mon
+            elif u == "billones": suf = " billones"
+            else: suf = " " + mon
+            return ("−" if neg else "") + num + suf
     return None
 
 def tendencia(item):
@@ -122,6 +132,26 @@ def tendencia(item):
     if re.search(r"\b(cae|caen|cayó|baja|bajan|hunde|desplom|recort|pierde|retroced|abarat|frena)", t): return "baja"
     if re.search(r"\b(sube|suben|subirá|gana|dispar|crece|récord|eleva|dispara|avanza|repunt|máximo)", t): return "sube"
     return None
+
+# Flecha de la cifra grande (2 nov): se decide SOLO con las palabras pegadas a la cifra, en su
+# misma frase. Antes se miraba el titular entero y salía flecha abajo con un texto que decía sube.
+_BAJA = r"(cae|caen|caer|caerá|cayó|caído|caída|bajado|perdido|mínimos|baja|bajan|bajar|bajó|bajada|descenso|desciende|hunde|hunden|hundió|desplom\w*|recort\w*|pierde|pierden|perdió|retroced\w*|abarat\w*|reduc\w*|merma|disminu\w*|retira|a la baja|se deja|se dejan)"
+_SUBE = r"(sube|suben|subir|subirá|subió|subido|subida|ganado|crecido|máximos|alza|al alza|aument\w*|crece|crecen|creció|crecimiento|dispar\w*|eleva|elevan|elevó|avanza|avanzan|avanzó|repunt\w*|revaloriz\w*|encarec\w*|gana|ganan|ganó|se anota|escala|escalan)"
+def tendencia_cifra(texto, ini, fin):
+    """'sube', 'baja' o None mirando hasta 7 palabras antes de la cifra y 3 después, sin salir de su frase."""
+    antes = re.split(r"[.;:!?]", texto[:ini])[-1]
+    despues = re.split(r"[.;:!?,]", texto[fin:])[0]
+    if "−" in texto[ini:fin] or "-" in texto[ini:fin][:1]: return "baja"
+    def mira(zona, cerca_al_final):
+        b = [m.end() for m in re.finditer(r"\b" + _BAJA + r"\b", zona)]
+        s_ = [m.end() for m in re.finditer(r"\b" + _SUBE + r"\b", zona)]
+        if b and not s_: return "baja"
+        if s_ and not b: return "sube"
+        if b and s_:  # manda el verbo más cercano a la cifra
+            return ("baja" if max(b) > max(s_) else "sube") if cerca_al_final else ("baja" if min(b) < min(s_) else "sube")
+        return None
+    # primero lo que va justo antes de la cifra ("sube un 2 %"); si no hay nada, lo de justo después
+    return mira(" ".join(antes.split()[-7:]).lower(), True) or mira(" ".join(despues.split()[:4]).lower(), False)
 
 def icono(item, t, tema=""):
     s = (item.get("titulo", "") + " " + item.get("resumen", "")).lower()
@@ -427,7 +457,7 @@ def montar(tema, segmentos, fecha, carpeta):
         t_w = next((a for w, a, b in tws[j + off] if re.sub(r"\D", "", w).startswith(lead)), None)
         if t_w is None: continue
         c = cifra({"titulo": tx}) or m.group(0)
-        cifras[j] = (E.cifra_grande(c, tendencia(x)), max(0.4, t_w - 0.1))
+        cifras[j] = (E.cifra_grande(c, tendencia_cifra(tx, m.start(), m.end())), max(0.4, t_w - 0.1))
     print(tema, "cifras:", {j: round(v[1], 1) for j, v in cifras.items()}, flush=True)
     for j, (_, tc) in cifras.items():  # 'pop' suave cuando aparece la cifra grande
         pp = E.pop(SR); i0 = int((cuts[j + off] + tc) * SR)

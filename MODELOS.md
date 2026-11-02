@@ -30,6 +30,11 @@ Es un vídeo sobre un único tema, contado en partes.
 - **Título de YouTube:** "{Titular}: qué está pasando, explicado en 1 minuto"
 
 ## Reglas comunes
+- **Antes de montar (2 de noviembre):** ejecutar `python3 revisar.py datos.json`.
+  - Muestra la cifra grande y la flecha de cada noticia.
+  - La flecha se decide solo con las palabras pegadas a la cifra ("cae un 3 %" → ▼ roja; "sube un 2 %" → ▲ verde; si no hay verbo, sin flecha y en dorado).
+  - Las cifras salen con punto de miles y moneda (6.300 M$, 950 M€).
+  - Si sale algún AVISO, se corrige el guion antes de montar.
 - **Fotos (regla del 31 de octubre, sustituye a la anterior):** siempre específicas del tema; nada genérico. Por ejemplo, nada de un avión para hablar de Corea del Norte ni de un skyline cualquiera de Abu Dabi.
   - **Empresa:** su logo (Binance → logo de Binance).
   - **País:** su bandera y además algo propio y reconocible del país.
