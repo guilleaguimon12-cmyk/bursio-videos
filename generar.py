@@ -289,7 +289,7 @@ def audio_seg(x, ruta, primero=False):
         sub = [leer(cc, ruta[:-4] + f"_{k}_{j}.wav") for j, cc in enumerate(c) if cc] if isinstance(c, list) else [leer(c, ruta[:-4] + f"_{k}.wav")]
         if RITMO and tipo == "noticia":
             t = _suav(TEMPO_FRASE[k % len(TEMPO_FRASE)] + _jit(semilla, k, 0.025))
-            p = _suav(TONO_FRASE[k % len(TONO_FRASE)] + _jit(semilla, k + 50, 0.006))
+            p = 1.0  # 2 nov: el tono ya no cambia (sonaba demasiado grave en las pausas); solo varía el ritmo
         elif RITMO and tipo == "cierre":
             t, p = 1.04, 1.0   # cierre ágil y natural, sin frenar (31 oct)
         else:
