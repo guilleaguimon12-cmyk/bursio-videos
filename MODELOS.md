@@ -36,6 +36,16 @@ Es un vídeo sobre un único tema, contado en partes.
   - Las cifras salen con punto de miles y moneda (6.300 M$, 950 M€).
   - Si sale algún AVISO, se corrige el guion antes de montar.
 - **Fotos (regla del 31 de octubre, sustituye a la anterior):** siempre específicas del tema; nada genérico. Por ejemplo, nada de un avión para hablar de Corea del Norte ni de un skyline cualquiera de Abu Dabi.
+  - **Lo más específico posible (2 de noviembre, norma general):** primero lo que pasa, luego quién o qué, y solo al final el lugar o la bandera. Nunca el recurso genérico si existe algo más concreto.
+    - **Búsqueda directa de fotos:** en `fotos` se puede poner "Search:<palabras>"; busca en Wikimedia Commons y devuelve fotos JPG grandes. Por ejemplo "Search:Delhi smog", "Search:Paris strike demonstration", "Search:FC Barcelona fans".
+    - **Fútbol:** escudo del club, afición con sus colores, camiseta, balón en el área, gol o portería, trofeo, el estadio CON partido. NO fotos de jugadores reconocibles (son personas públicas).
+    - **Otros deportes:** el coche, la moto o la pista de esa carrera, la raqueta o la pista del torneo concreto y su trofeo; tampoco primeros planos de deportistas.
+    - **Economía:** el producto o la planta de la empresa, el barril o petrolero si hablamos de petróleo, la sede del banco central.
+  - **Foto del HECHO primero (2 de noviembre):** la primera foto tiene que enseñar lo que pasa en la noticia, y después va la bandera o el lugar emblemático. Ejemplos:
+    - contaminación en Nueva Delhi → foto de aire sucio o niebla tóxica ("Air pollution in Delhi");
+    - huelgas o manifestaciones en Francia → foto de manifestaciones ("2023 French pension reform unrest");
+    - incendio → foto de incendio; elecciones → urnas o colegio electoral; guerra o ataque → daños o tropas, nunca un mapa.
+    - Las multitudes valen; los primeros planos de personas reconocibles, no.
   - **Empresa:** su logo (Binance → logo de Binance).
   - **País:** su bandera y además algo propio y reconocible del país.
   - **Cripto:** su logo (bitcoin → logo de bitcoin).
