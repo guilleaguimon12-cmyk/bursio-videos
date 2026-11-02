@@ -1,3 +1,4 @@
+import os
 """Vídeo vertical de Bursio (1080x1920, 30 fps, 60 s): resumen de economía
 con texto animado, gráficos propios y música. Escribe fotogramas a ffmpeg."""
 import math, subprocess, sys, functools
@@ -9,7 +10,11 @@ def font(name, size): return ImageFont.truetype(F + name, size)
 @functools.lru_cache(None)
 def inter(w, s): return font(f"inter-latin-{w}-normal.woff", s)
 @functools.lru_cache(None)
-def play(w, s): return font(f"playfair-display-latin-{w}-normal.woff", s)
+def play(w, s):
+    # 2 nov: Guille pidió letra recta (la serif "parecía Claude"). Los títulos usan Inter 800,
+    # un 12 % más pequeña porque es más ancha que la Playfair. FUENTE_SERIF=1 vuelve a la antigua.
+    if os.environ.get("FUENTE_SERIF") == "1": return font(f"playfair-display-latin-{w}-normal.woff", s)
+    return font("inter-latin-800-normal.woff", max(10, int(s * 0.88)))
 
 BG0, BG1 = (14, 12, 9), (27, 21, 12)
 GOLD = (214, 176, 88); GOLD2 = (240, 206, 120)
